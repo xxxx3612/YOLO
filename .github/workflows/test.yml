@@ -1,4 +1,4 @@
-name: YOLO project
+name: YOLOtest project
 
 on:
   push:

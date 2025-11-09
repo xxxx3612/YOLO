@@ -1,36 +1,58 @@
-def calculator():
-    print("简单计算器")
-    print("1. 加法")
-    print("2. 减法")
-    print("3. 乘法")
-    print("4. 除法")
-    print("5. 退出")
+class Calculator:
+    def __init__(self):
+        self.current = ""
+        self.result = 0
+        self.new_number = True
+        self.last_operation = None
 
-    while True:
-        choice = input("请选择操作(1-5): ")
-
-        if choice == "5":
-            print("感谢使用！")
-            break
-
-        if choice in ("1", "2", "3", "4"):
-            num1 = float(input("请输入第一个数字: "))
-            num2 = float(input("请输入第二个数字: "))
-
-            if choice == "1":
-                print(f"{num1} + {num2} = {num1 + num2}")
-            elif choice == "2":
-                print(f"{num1} - {num2} = {num1 - num2}")
-            elif choice == "3":
-                print(f"{num1} * {num2} = {num1 * num2}")
-            elif choice == "4":
-                if num2 == 0:
-                    print("错误：除数不能为0！")
-                else:
-                    print(f"{num1} / {num2} = {num1 / num2}")
+    def number_press(self, number):
+        if self.new_number:
+            self.current = str(number)
+            self.new_number = False
         else:
-            print("无效的选择！请重新输入。")
+            self.current += str(number)
+        return self.current
 
+    def operation_press(self, operation):
+        if self.current:
+            if not self.new_number:
+                self.calculate()
+                self.new_number = True
+            self.last_operation = operation
+        return str(self.result)
 
-if __name__ == "__main__":
-    calculator()
+    def calculate(self):
+        if self.last_operation:
+            try:
+                current = float(self.current)
+                if self.last_operation == "+":
+                    self.result += current
+                elif self.last_operation == "-":
+                    self.result -= current
+                elif self.last_operation == "*":
+                    self.result *= current
+                elif self.last_operation == "/":
+                    if current == 0:
+                        self.result = "错误：除数不能为0"
+                        return
+                    self.result /= current
+            except ValueError:
+                self.result = "错误"
+        else:
+            try:
+                self.result = float(self.current)
+            except ValueError:
+                self.result = "错误"
+
+    def clear(self):
+        self.current = ""
+        self.result = 0
+        self.new_number = True
+        self.last_operation = None
+        return "0"
+
+    def get_result(self):
+        self.calculate()
+        self.new_number = True
+        self.last_operation = None
+        return str(self.result)
