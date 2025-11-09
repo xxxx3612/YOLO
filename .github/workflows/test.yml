@@ -5,6 +5,9 @@ on:
     branches:
       - main
 
+permissions:
+  contents: write
+
 jobs:
   # 代码质量检查
   test:
@@ -28,5 +31,13 @@ jobs:
           flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
           flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
       
-      - name: Check formatting with black
-        run: black --check .
+      - name: Format with black
+        run: black .
+      
+      - name: Commit formatted files
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add .
+          git diff --quiet && git diff --staged --quiet || git commit -m "style: format code with black"
+          git push
