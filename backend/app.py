@@ -3,7 +3,6 @@ from flask_cors import CORS
 import sys
 import os
 
-# 添加项目根目录到 Python 路径
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from calculator import Calculator
 
@@ -26,6 +25,5 @@ def calculate():
     return jsonify({'result': result})
 
 if __name__ == '__main__':
-    print("正在启动 Flask 服务器...")
-    print("API 端点: http://127.0.0.1:5000/api/calculate")
-    app.run(debug=True, host='127.0.0.1', port=5000)
+    port = int(os.environ.get('PORT', 5000))  # 获取端口
+    app.run(host='0.0.0.0', port=port) # 绑定到 0.0.0.0
