@@ -26,6 +26,16 @@ def calculate():
     return jsonify({"result": result})
 
 
+@app.route('/')
+def home():
+    return 'Flask 后端运行正常！'
+
+
+@app.route('/favicon.ico')
+def favicon():
+    return app.send_static_file('favicon.ico')
+
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))  # 获取端口
     app.run(host="0.0.0.0", port=port)  # 绑定到 0.0.0.0
