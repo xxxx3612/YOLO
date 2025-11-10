@@ -9,20 +9,21 @@ from calculator import Calculator
 app = Flask(__name__)
 CORS(app)
 
-@app.route('/api/calculate', methods=['POST'])
+
+@app.route("/api/calculate", methods=["POST"])
 def calculate():
     print("收到计算请求")
     data = request.json
     print(f"接收到的数据: {data}")
-    num1 = data.get('num1')
-    num2 = data.get('num2')
-    op = data.get('op')
+    num1 = data.get("num1")
+    num2 = data.get("num2")
+    op = data.get("op")
     calc = Calculator()
     calc.number_press(str(num1))
     calc.operation_press(op)
     calc.number_press(str(num2))
     result = calc.get_result()
-    return jsonify({'result': result})
+    return jsonify({"result": result})
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))  # 获取端口
