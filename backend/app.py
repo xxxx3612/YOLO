@@ -26,14 +26,14 @@ def calculate():
     return jsonify({"result": result})
 
 
-@app.route('/')
+@app.route("/")
 def home():
-    return 'Flask 后端运行正常！'
+    return "Flask 后端运行正常！"
 
 
-@app.route('/favicon.ico')
+@app.route("/favicon.ico")
 def favicon():
-    return app.send_static_file('favicon.ico')
+    return app.send_static_file("favicon.ico")
 
 
 if __name__ == "__main__":
