@@ -25,6 +25,7 @@ def calculate():
     result = calc.get_result()
     return jsonify({"result": result})
 
-if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))  # 获取端口
-    app.run(host='0.0.0.0', port=port) # 绑定到 0.0.0.0
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))  # 获取端口
+    app.run(host="0.0.0.0", port=port)  # 绑定到 0.0.0.0
