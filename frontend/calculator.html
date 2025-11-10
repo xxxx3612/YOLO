@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>简易计算器</title>
+    <style>
+        body { font-family: Arial; margin: 40px; }
+        input, select, button { font-size: 1.2em; margin: 5px; }
+    </style>
+</head>
+<body>
+    <h2>简易计算器</h2>
+    <input type="number" id="num1" placeholder="数字1">
+    <select id="op">
+        <option value="+">+</option>
+        <option value="-">-</option>
+        <option value="*">*</option>
+        <option value="/">/</option>
+    </select>
+    <input type="number" id="num2" placeholder="数字2">
+    <button onclick="calculate()">计算</button>
+    <div id="result" style="margin-top:20px;font-size:1.3em;"></div>
+
+    <script>
+        function calculate() {
+            const num1 = document.getElementById('num1').value;
+            const num2 = document.getElementById('num2').value;
+            const op = document.getElementById('op').value;
+            fetch('http://127.0.0.1:5000/api/calculate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ num1, num2, op })
+            })
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById('result').innerText = '结果：' + data.result;
+            })
+            .catch(err => {
+                console.error('Error:', err);
+                document.getElementById('result').innerText = '请求失败: ' + err.message;
+            });
+        }
+    </script>
+</body>
+</html>

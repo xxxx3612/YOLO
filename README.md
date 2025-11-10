@@ -10,6 +10,7 @@
 - git version 2.51.0.windows.1   
 - conda 25.5.1   
 - python 3.11
+- flask 3.1.0
 
 ## 主要依赖
 ### 后端
