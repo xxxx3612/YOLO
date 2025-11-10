@@ -17,7 +17,9 @@
 - Flask (v3.0.0)
 
 ### 前端
-- Vue.js (v3.3.8)
+- Vue.js
+- Vite
+- axios 用于处理HTTP请求
 
 ### 测试
 - Black (v23.11.0)

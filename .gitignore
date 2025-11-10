@@ -24,13 +24,62 @@ wheels/
 # Virtual Environment
 venv/
 ENV/
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
 
-# IDE
+# Vue.js / Node.js
+node_modules/
+dist/
+dist-ssr/
+*.local
+.env.local
+.env.*.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+.nuxt
+.nitro
+.cache
+.output
+
+# IDE / Editor
 .idea/
 .vscode/
 *.swp
 *.swo
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
 
-# OS
+# OS generated files
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Optional: Local development files
+*.log
+logs/
+*.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Vite
+.vite/
+*.timestamp-*.mjs
