@@ -1,0 +1,24 @@
+# 应用配置
+app:
+  name: "YOLO Vision System"  # 应用名称
+  version: "1.0.0"           # 版本号
+  debug: false               # 调试模式，生产环境设为false
+
+# 服务器配置
+server:
+  host: "0.0.0.0"           # 监听所有IP地址
+  port: 5000                # 服务端口
+
+# YOLO模型配置
+model:
+  name: "yolov8n.pt"        # 使用的YOLO模型，会自动下载
+  confidence_threshold: 0.25 # 置信度阈值，大于此值才认为是有效检测
+  iou_threshold: 0.45       # 交并比阈值，用于非极大值抑制
+  image_size: 640           # 输入图像尺寸
+
+# 文件上传配置
+upload:
+  allowed_extensions: ["jpg", "jpeg", "png", "bmp", "tiff", "webp"]  # 允许的图片格式
+  max_file_size: 16777216   # 最大文件大小16MB (16 * 1024 * 1024)
+  upload_folder: "uploads"  # 上传文件保存目录
+  result_folder: "static/results"  # 检测结果保存目录
