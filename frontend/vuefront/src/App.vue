@@ -48,28 +48,50 @@ const handleDetect = async () => {
 
   try {
     const formData = new FormData()
-    formData.append('file', selectedFile.value)
+    formData.append('image', selectedFile.value)
+    formData.append('confidence', '0.25')
+    formData.append('iou', '0.45')
 
-    // 模拟延迟
-    await new Promise(resolve => setTimeout(resolve, 2000))
-    
-    // 模拟结果
-    const mockResults = {
-      detections: [
-        { class: '人', confidence: 0.95, bbox: [100, 150, 200, 350] },
-        { class: '汽车', confidence: 0.88, bbox: [300, 200, 450, 320] },
-        { class: '狗', confidence: 0.92, bbox: [500, 250, 600, 380] }
-      ],
-      processingTime: '1.2s',
-      totalObjects: 3
+    // 调用后端 API
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+    const response = await fetch(`${apiUrl}/api/detect`, {
+      method: 'POST',
+      body: formData
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
     }
+
+    const data = await response.json()
     
-    detectionResults.value = mockResults
-    resultUrl.value = previewUrl.value
+    if (data.success) {
+      // 转换后端返回的数据格式
+      const detections = data.detections.map(det => ({
+        class: det.class_name,
+        confidence: det.confidence,
+        bbox: [det.bbox.x1, det.bbox.y1, det.bbox.x2, det.bbox.y2]
+      }))
+      
+      detectionResults.value = {
+        detections: detections,
+        processingTime: '实时',
+        totalObjects: data.detection_count
+      }
+      
+      // 显示结果图像（现在是 base64 格式）
+      if (data.result_image) {
+        resultUrl.value = data.result_image
+      } else {
+        resultUrl.value = previewUrl.value
+      }
+    } else {
+      throw new Error(data.error || '检测失败')
+    }
 
   } catch (error) {
     console.error('检测错误:', error)
-    alert('检测失败，请重试')
+    alert(`检测失败: ${error.message}`)
   } finally {
     isDetecting.value = false
   }
@@ -121,6 +143,38 @@ const captureFromCamera = () => {
       previewUrl.value = URL.createObjectURL(file)
       toggleCamera()
     }, 'image/jpeg')
+  }
+}
+
+// 下载检测结果到本地
+const downloadResult = async () => {
+  if (!resultUrl.value) return
+  
+  try {
+    // 如果是 base64 格式，直接下载
+    if (resultUrl.value.startsWith('data:')) {
+      const link = document.createElement('a')
+      link.href = resultUrl.value
+      link.download = `yolo_detection_${new Date().getTime()}.jpg`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+    } else {
+      // 如果是 URL，先 fetch 再下载
+      const response = await fetch(resultUrl.value)
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `yolo_detection_${new Date().getTime()}.jpg`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+    }
+  } catch (error) {
+    console.error('下载失败:', error)
+    alert('下载失败，请重试')
   }
 }
 </script>
@@ -224,6 +278,10 @@ const captureFromCamera = () => {
               <img :src="resultUrl" alt="检测结果" class="w-full h-auto max-h-96 object-contain mx-auto" />
             </div>
 
+            <button v-if="resultUrl" @click="downloadResult" class="w-full mb-4 flex items-center justify-center gap-2 py-3 px-4 bg-green-500 hover:bg-green-600 text-white rounded-lg font-medium transition-all shadow-md">
+              💾 保存结果到本地
+            </button>
+
             <div v-if="detectionResults" class="space-y-4">
               <div class="grid grid-cols-2 gap-4">
                 <div class="bg-blue-50 p-4 rounded-lg">
@@ -271,12 +329,6 @@ const captureFromCamera = () => {
             <div class="text-2xl">3️⃣</div>
             <div><strong>查看结果：</strong>点击"开始检测"查看识别结果和详细信息</div>
           </div>
-        </div>
-        
-        <div class="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-          <p class="text-sm text-yellow-800">
-            <strong>⚠️ 开发提示：</strong>当前为演示模式，检测结果为模拟数据。实际使用时，请在 <code class="bg-yellow-100 px-1 rounded">handleDetect</code> 函数中替换为真实的后端 API 调用。
-          </p>
         </div>
       </div>
       

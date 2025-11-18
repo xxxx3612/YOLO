@@ -1,23 +1,25 @@
 services:
-  # 后端
+  # YOLO 后端 API
   - type: web
-    name: calculator-api
+    name: yolo-detection-api
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: cd backend && gunicorn app:app
+    startCommand: cd backend && python app.py
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.4
-      - key: FLASK_ENV
-        value: production
 
-  # 前端
+  # Vue 前端
   - type: web
-    name: calculator-frontend
-    env: static
-    buildCommand: echo "Static site, no build needed"
-    staticPublishPath: ./frontend
-    routes:
-      - type: rewrite
-        source: /api/*
-        destination: calculator-api/api/*
+    name: yolo-detection-frontend
+    env: node
+    buildCommand: cd frontend/vuefront && npm install && npm run build
+    startCommand: cd frontend/vuefront && npm run preview -- --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: NODE_VERSION
+        value: 18
+      - key: VITE_API_URL
+        fromService:
+          name: yolo-detection-api
+          type: web
+          property: host

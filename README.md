@@ -1,65 +1,70 @@
-# INT617group assessment
-使用YOLO模型创建一个视觉识别系统   
-使用github action完成CI/CD流程   
+# YOLO Object Detection System
 
-使用flask打包后端，API
-使用VUE进行前端页面的编写
-使用render
+基于 YOLOv8 的目标检测系统，支持图片、视频和摄像头实时检测。
 
-## 环境
-- git version 2.51.0.windows.1   
-- conda 25.5.1   
-- python 3.11
-- flask 3.1.0
+## 环境要求
+- Python 3.11+
+- Node.js 18+
+- Git 2.51.0+
 
-## 主要依赖
+## 技术栈
+
 ### 后端
-- Flask (v3.0.0)
+- Flask 3.1.0
+- Flask-CORS
+- OpenCV (cv2)
+- Ultralytics YOLOv8
+- PyTorch
 
 ### 前端
-- Vue.js
+- Vue 3
 - Vite
-- axios 用于处理HTTP请求
 
-### 测试
-- Black (v23.11.0)
-- Flake8 (v6.1.0)
-- pytest (v7.4.3)
+## 快速启动
 
-## 启动方式
+### 方式一：一键启动（推荐）
+```bash
+start.bat
+```
 
-### 启动后端（Flask）
-1. 打开终端，进入 backend 目录：
-   ```bash
-   cd backend
-   ```
-2. 安装依赖：
-   ```bash
-   pip install -r requirements.txt
-   ```
-3. 启动后端服务：
-   ```bash
-   python app.py
-   ```
-   后端服务默认运行在 http://localhost:5000
+### 方式二：手动启动
 
-### 启动前端（Vue）
-1. 打开新终端，进入 frontend 目录：
-   ```bash
-   cd frontend
-   ```
-2. 安装依赖：
-   ```bash
-   npm install
-   ```
-3. 启动前端开发服务器：
-   ```bash
-   npm run dev
-   ```
-   前端页面默认运行在 http://localhost:5173
+#### 启动后端
+```bash
+cd backend
+pip install flask flask-cors opencv-python ultralytics torch torchvision
+python app.py
+```
+后端运行在 http://localhost:5000
 
-### 访问项目
-- 在浏览器中访问 http://localhost:5173
-- 输入表达式，点击按钮即可体验前后端联动的计算器
+#### 启动前端
+```bash
+cd frontend/vuefront
+npm install
+npm run dev
+```
+前端运行在 http://localhost:5173
 
-如遇到依赖安装或端口占用等问题，请将报错信息反馈，我会协助排查。
+## 使用说明
+
+1. 在浏览器访问 http://localhost:5173
+2. 选择检测模式（图片/视频/摄像头）
+3. 上传文件或打开摄像头
+4. 点击"开始检测"查看结果
+
+## 项目结构
+```
+YOLO/
+├── backend/          # Flask 后端
+│   ├── app.py       # 主应用
+│   ├── models/      # YOLO 模型文件
+│   ├── uploads/     # 临时上传目录
+│   └── static/results/  # 检测结果图片
+├── frontend/vuefront/   # Vue 前端
+│   └── src/App.vue
+└── start.bat        # 一键启动脚本
+```
+
+## API 文档
+
+详见 [README_FULLSTACK.md](README_FULLSTACK.md)

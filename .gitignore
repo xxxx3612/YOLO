@@ -80,6 +80,10 @@ logs/
 .env.test.local
 .env.production.local
 
+# Local development scripts
+start.bat
+start.sh
+
 # Vite
 .vite/
 *.timestamp-*.mjs
