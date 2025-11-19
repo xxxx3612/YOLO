@@ -19,8 +19,8 @@ from pathlib import Path
 # 内存优化设置
 torch.set_num_threads(1)  # 限制 PyTorch CPU 线程数
 torch.set_grad_enabled(False)  # 禁用梯度计算（仅推理）
-os.environ['OMP_NUM_THREADS'] = '1'
-os.environ['MKL_NUM_THREADS'] = '1'
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
 
 # 配置
 BASE_DIR = Path(__file__).parent
@@ -104,7 +104,7 @@ def perform_detection(image_path, confidence=0.25, iou=0.45):
         image = cv2.imread(image_path)
         if image is None:
             raise ValueError("无法读取图像")
-        
+
         # 限制图像尺寸以减少内存占用
         max_dimension = 640
         height, width = image.shape[:2]
@@ -112,7 +112,9 @@ def perform_detection(image_path, confidence=0.25, iou=0.45):
             scale = max_dimension / max(height, width)
             new_width = int(width * scale)
             new_height = int(height * scale)
-            image = cv2.resize(image, (new_width, new_height), interpolation=cv2.INTER_AREA)
+            image = cv2.resize(
+                image, (new_width, new_height), interpolation=cv2.INTER_AREA
+            )
 
         # YOLO 检测
         results = model(image, conf=confidence, iou=iou)
@@ -291,7 +293,50 @@ def internal_error(error):
     return jsonify({"success": False, "error": "服务器内部错误"}), 500
 
 
-    # 启动 Flask 开发服务器
+if __name__ == "__main__":
+    print("=" * 60)
+    print("🎯 YOLO 目标检测系统 - 开发服务器")
+    print("=" * 60)
+    print()
+    print("✓ 系统就绪（模型将在首次请求时加载）")
+    print()
+    
     # 从环境变量读取端口（Render 会设置 PORT）
     port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port, debug=True, use_reloader=True)
+    host = "0.0.0.0"
+    
+    # 检测是否在 Render 环境
+    render_service_name = os.environ.get("RENDER_SERVICE_NAME")
+    render_external_url = os.environ.get("RENDER_EXTERNAL_URL")
+    
+    print("📍 服务地址:")
+    if render_external_url:
+        # Render 生产环境
+        print(f"   - 外部访问: {render_external_url}")
+        print(f"   - API:     {render_external_url}/api/detect")
+        print(f"   - 健康检查: {render_external_url}/api/health")
+    else:
+        # 本地开发环境
+        print(f"   - 本地:    http://localhost:{port}")
+        print(f"   - API:     http://localhost:{port}/api/detect")
+        print(f"   - 健康检查: http://localhost:{port}/api/health")
+    
+    print()
+    print("📁 文件存储:")
+    print(f"   - 上传目录: {UPLOAD_FOLDER}")
+    print(f"   - 模型目录: {MODEL_FOLDER}")
+    print()
+    
+    if render_service_name:
+        print(f"☁️  Render 服务: {render_service_name}")
+        print("🔧 生产模式: CPU-only PyTorch")
+    else:
+        print("🔧 开发模式: 已启用代码热重载")
+    
+    print("💡 内存优化: 延迟加载模型 + CPU-only PyTorch")
+    print("按 Ctrl+C 停止服务器")
+    print("=" * 60)
+    print()
+
+    # 启动 Flask 开发服务器
+    app.run(host=host, port=port, debug=True, use_reloader=True)
