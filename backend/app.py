@@ -46,7 +46,7 @@ CORS(
             "origins": [
                 "http://localhost:5173",
                 "http://localhost:3000",
-                "https://yolofrontend.onrender.com",  #Render前端
+                "https://yolofrontend.onrender.com",  # Render前端
             ],
             "methods": ["GET", "POST", "OPTIONS"],
             "allow_headers": ["Content-Type"],
