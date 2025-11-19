@@ -23,21 +23,18 @@ os.environ['MKL_NUM_THREADS'] = '1'
 # 配置
 BASE_DIR = Path(__file__).parent
 UPLOAD_FOLDER = BASE_DIR / "uploads"
-RESULT_FOLDER = BASE_DIR / "static" / "results"
 MODEL_FOLDER = BASE_DIR / "models"
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "bmp", "webp"}
 MAX_FILE_SIZE = 16 * 1024 * 1024  # 16MB
 
 # 创建必要目录
 UPLOAD_FOLDER.mkdir(exist_ok=True)
-RESULT_FOLDER.mkdir(parents=True, exist_ok=True)
 MODEL_FOLDER.mkdir(exist_ok=True)
 
 # 创建 Flask 应用
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = MAX_FILE_SIZE
 app.config["UPLOAD_FOLDER"] = str(UPLOAD_FOLDER)
-app.config["RESULT_FOLDER"] = str(RESULT_FOLDER)
 
 # 启用 CORS，允许前端跨域访问
 CORS(
@@ -254,12 +251,6 @@ def get_classes():
     )
 
 
-@app.route("/static/results/<path:filename>")
-def serve_result(filename):
-    """提供检测结果图片"""
-    return send_from_directory(str(RESULT_FOLDER), filename)
-
-
 @app.errorhandler(413)
 def request_entity_too_large(error):
     """文件过大错误处理"""
@@ -305,7 +296,7 @@ if __name__ == "__main__":
         print()
         print("📁 文件存储:")
         print(f"   - 上传目录: {UPLOAD_FOLDER}")
-        print(f"   - 结果目录: {RESULT_FOLDER}")
+        print(f"   - 模型目录: {MODEL_FOLDER}")
         print()
         print("🔧 开发模式: 已启用代码热重载")
         print("按 Ctrl+C 停止服务器")
