@@ -10,9 +10,15 @@ from flask_cors import CORS
 from werkzeug.utils import secure_filename
 import cv2
 import numpy as np
+import torch
 from ultralytics import YOLO
 from datetime import datetime
 from pathlib import Path
+
+# 内存优化设置
+torch.set_num_threads(1)  # 限制 PyTorch CPU 线程数
+os.environ['OMP_NUM_THREADS'] = '1'
+os.environ['MKL_NUM_THREADS'] = '1'
 
 # 配置
 BASE_DIR = Path(__file__).parent
@@ -95,6 +101,15 @@ def perform_detection(image_path, confidence=0.25, iou=0.45):
         image = cv2.imread(image_path)
         if image is None:
             raise ValueError("无法读取图像")
+        
+        # 限制图像尺寸以减少内存占用
+        max_dimension = 640
+        height, width = image.shape[:2]
+        if max(height, width) > max_dimension:
+            scale = max_dimension / max(height, width)
+            new_width = int(width * scale)
+            new_height = int(height * scale)
+            image = cv2.resize(image, (new_width, new_height), interpolation=cv2.INTER_AREA)
 
         # YOLO 检测
         results = yolo_model(image, conf=confidence, iou=iou)
