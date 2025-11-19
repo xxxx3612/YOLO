@@ -1,0 +1,9 @@
+# Development dependencies (includes production dependencies + testing tools)
+-r requirements.txt
+
+# Testing
+pytest>=7.4.3
+
+# Code quality
+black>=23.11.0
+flake8>=6.1.0
