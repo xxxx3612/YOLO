@@ -347,8 +347,8 @@ if __name__ == "__main__":
     # 启动 Flask 服务器
     # Render 环境禁用 debug 和 reloader 以避免重启问题
     app.run(
-        host=host, 
-        port=port, 
+        host=host,
+        port=port,
         debug=not is_render,  # Render 上禁用 debug
-        use_reloader=not is_render  # Render 上禁用 reloader
+        use_reloader=not is_render,  # Render 上禁用 reloader
     )
