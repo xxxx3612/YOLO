@@ -16,11 +16,11 @@ from ultralytics import YOLO
 from datetime import datetime
 from pathlib import Path
 
-# 内存优化设置
-torch.set_num_threads(1)  # 限制 PyTorch CPU 线程数
+# 性能优化设置（平衡速度和内存）
+torch.set_num_threads(2)  # 使用 2 个 CPU 线程（提升速度）
 torch.set_grad_enabled(False)  # 禁用梯度计算（仅推理）
-os.environ["OMP_NUM_THREADS"] = "1"
-os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["OMP_NUM_THREADS"] = "2"
+os.environ["MKL_NUM_THREADS"] = "2"
 
 # 配置
 BASE_DIR = Path(__file__).parent
