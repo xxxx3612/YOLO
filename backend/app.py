@@ -5,6 +5,7 @@ YOLO 目标检测系统 - Flask 后端 API
 """
 import os
 import base64
+import gc
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
@@ -17,6 +18,7 @@ from pathlib import Path
 
 # 内存优化设置
 torch.set_num_threads(1)  # 限制 PyTorch CPU 线程数
+torch.set_grad_enabled(False)  # 禁用梯度计算（仅推理）
 os.environ['OMP_NUM_THREADS'] = '1'
 os.environ['MKL_NUM_THREADS'] = '1'
 
@@ -52,24 +54,25 @@ CORS(
 yolo_model = None
 
 
-def load_yolo_model():
-    """加载 YOLO 模型"""
+def get_yolo_model():
+    """延迟加载 YOLO 模型（首次请求时加载）"""
     global yolo_model
-    try:
-        model_path = MODEL_FOLDER / "yolov8n.pt"
-        if model_path.exists():
-            print(f"正在加载本地模型: {model_path}")
-            yolo_model = YOLO(str(model_path))
-        else:
-            print("本地模型不存在，将下载 YOLOv8n...")
-            yolo_model = YOLO("yolov8n.pt")
-
-        print(f"✓ YOLO 模型加载成功！")
-        print(f"  支持的类别数: {len(yolo_model.names)}")
-        return True
-    except Exception as e:
-        print(f"✗ 模型加载失败: {e}")
-        return False
+    if yolo_model is None:
+        try:
+            model_path = MODEL_FOLDER / "yolov8n.pt"
+            if model_path.exists():
+                print(f"正在加载本地模型: {model_path}")
+                yolo_model = YOLO(str(model_path))
+            else:
+                print("本地模型不存在，将下载 YOLOv8n...")
+                yolo_model = YOLO("yolov8n.pt")
+            
+            print(f"✓ YOLO 模型加载成功！")
+            print(f"  支持的类别数: {len(yolo_model.names)}")
+        except Exception as e:
+            print(f"✗ 模型加载失败: {e}")
+            raise
+    return yolo_model
 
 
 def allowed_file(filename):
@@ -94,6 +97,9 @@ def save_uploaded_file(file):
 def perform_detection(image_path, confidence=0.25, iou=0.45):
     """执行 YOLO 目标检测"""
     try:
+        # 获取模型（延迟加载）
+        model = get_yolo_model()
+        
         # 读取图像
         image = cv2.imread(image_path)
         if image is None:
@@ -109,7 +115,7 @@ def perform_detection(image_path, confidence=0.25, iou=0.45):
             image = cv2.resize(image, (new_width, new_height), interpolation=cv2.INTER_AREA)
 
         # YOLO 检测
-        results = yolo_model(image, conf=confidence, iou=iou)
+        results = model(image, conf=confidence, iou=iou)
         result = results[0]
 
         # 解析检测结果
@@ -119,7 +125,7 @@ def perform_detection(image_path, confidence=0.25, iou=0.45):
             for box in boxes:
                 detection = {
                     "class_id": int(box.cls[0]),
-                    "class_name": yolo_model.names[int(box.cls[0])],
+                    "class_name": model.names[int(box.cls[0])],
                     "confidence": float(box.conf[0]),
                     "bbox": {
                         "x1": float(box.xyxy[0][0]),
@@ -133,8 +139,9 @@ def perform_detection(image_path, confidence=0.25, iou=0.45):
         # 绘制检测结果
         annotated_image = result.plot()
 
-        # 将图像编码为 base64，不保存到服务器
-        _, buffer = cv2.imencode(".jpg", annotated_image)
+        # 将图像编码为 base64，降低质量以节省内存
+        encode_param = [cv2.IMWRITE_JPEG_QUALITY, 85]  # 85% 质量（默认 95）
+        _, buffer = cv2.imencode(".jpg", annotated_image, encode_param)
         image_base64 = base64.b64encode(buffer).decode("utf-8")
 
         return {
@@ -147,6 +154,9 @@ def perform_detection(image_path, confidence=0.25, iou=0.45):
 
     except Exception as e:
         return {"success": False, "error": str(e)}
+    finally:
+        # 清理内存
+        gc.collect()
 
 
 # ============ API 路由 ============
@@ -168,11 +178,13 @@ def index():
 @app.route("/api/health", methods=["GET"])
 def health_check():
     """健康检查"""
+    model_loaded = yolo_model is not None
     return jsonify(
         {
             "status": "healthy",
             "service": "YOLO Detection API",
-            "model_loaded": yolo_model is not None,
+            "model_loaded": model_loaded,
+            "model_status": "loaded" if model_loaded else "will load on first request",
             "timestamp": datetime.now().isoformat(),
         }
     )
@@ -185,9 +197,11 @@ def detect():
         return "", 204
 
     try:
-        # 检查模型是否加载
-        if yolo_model is None:
-            return jsonify({"success": False, "error": "YOLO 模型未加载"}), 500
+        # 检查模型是否可用（延迟加载会在这里触发）
+        try:
+            get_yolo_model()
+        except Exception as e:
+            return jsonify({"success": False, "error": f"模型加载失败: {str(e)}"}), 500
 
         # 检查文件
         if "image" not in request.files:
@@ -239,16 +253,17 @@ def detect():
 @app.route("/api/classes", methods=["GET"])
 def get_classes():
     """获取支持的类别列表"""
-    if yolo_model is None:
-        return jsonify({"success": False, "error": "YOLO 模型未加载"}), 500
-
-    return jsonify(
-        {
-            "success": True,
-            "classes": yolo_model.names,
-            "total_classes": len(yolo_model.names),
-        }
-    )
+    try:
+        model = get_yolo_model()
+        return jsonify(
+            {
+                "success": True,
+                "classes": model.names,
+                "total_classes": len(model.names),
+            }
+        )
+    except Exception as e:
+        return jsonify({"success": False, "error": f"模型未加载: {str(e)}"}), 500
 
 
 @app.errorhandler(413)
@@ -264,7 +279,6 @@ def request_entity_too_large(error):
         413,
     )
 
-
 @app.errorhandler(404)
 def not_found(error):
     """404 错误处理"""
@@ -277,39 +291,7 @@ def internal_error(error):
     return jsonify({"success": False, "error": "服务器内部错误"}), 500
 
 
-if __name__ == "__main__":
-    print("=" * 60)
-    print("🎯 YOLO 目标检测系统 - 开发服务器")
-    print("=" * 60)
-    print()
-
-    # 加载 YOLO 模型
-    print("正在初始化...")
-    if load_yolo_model():
-        print()
-        print("✓ 系统初始化完成")
-        print()
-        print("📍 服务地址:")
-        print("   - 本地:    http://localhost:5000")
-        print("   - API:     http://localhost:5000/api/detect")
-        print("   - 健康检查: http://localhost:5000/api/health")
-        print()
-        print("📁 文件存储:")
-        print(f"   - 上传目录: {UPLOAD_FOLDER}")
-        print(f"   - 模型目录: {MODEL_FOLDER}")
-        print()
-        print("🔧 开发模式: 已启用代码热重载")
-        print("按 Ctrl+C 停止服务器")
-        print("=" * 60)
-        print()
-
-        # 启动 Flask 开发服务器
-        # 从环境变量读取端口（Render 会设置 PORT）
-        port = int(os.environ.get("PORT", 5000))
-        app.run(host="0.0.0.0", port=port, debug=True, use_reloader=True)
-    else:
-        print()
-        print("✗ 模型加载失败，无法启动服务器")
-        print("请检查:")
-        print("  1. 是否已安装 ultralytics: pip install ultralytics")
-        print("  2. 网络连接是否正常（首次运行会下载模型）")
+    # 启动 Flask 开发服务器
+    # 从环境变量读取端口（Render 会设置 PORT）
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=True, use_reloader=True)
