@@ -9,6 +9,8 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.4
+      - key: YOLO_CONFIG_DIR
+        value: /tmp/Ultralytics
 
   # Vue 前端
   - type: web
