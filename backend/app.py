@@ -66,7 +66,7 @@ def get_yolo_model():
             else:
                 print("本地模型不存在，将下载 YOLOv8n...")
                 yolo_model = YOLO("yolov8n.pt")
-            
+
             print(f"✓ YOLO 模型加载成功！")
             print(f"  支持的类别数: {len(yolo_model.names)}")
         except Exception as e:
@@ -99,7 +99,7 @@ def perform_detection(image_path, confidence=0.25, iou=0.45):
     try:
         # 获取模型（延迟加载）
         model = get_yolo_model()
-        
+
         # 读取图像
         image = cv2.imread(image_path)
         if image is None:
@@ -281,6 +281,7 @@ def request_entity_too_large(error):
         413,
     )
 
+
 @app.errorhandler(404)
 def not_found(error):
     """404 错误处理"""
@@ -300,15 +301,15 @@ if __name__ == "__main__":
     print()
     print("✓ 系统就绪（模型将在首次请求时加载）")
     print()
-    
+
     # 从环境变量读取端口（Render 会设置 PORT）
     port = int(os.environ.get("PORT", 5000))
     host = "0.0.0.0"
-    
+
     # 检测是否在 Render 环境
     render_service_name = os.environ.get("RENDER_SERVICE_NAME")
     render_external_url = os.environ.get("RENDER_EXTERNAL_URL")
-    
+
     print("📍 服务地址:")
     if render_external_url:
         # Render 生产环境
@@ -320,19 +321,19 @@ if __name__ == "__main__":
         print(f"   - 本地:    http://localhost:{port}")
         print(f"   - API:     http://localhost:{port}/api/detect")
         print(f"   - 健康检查: http://localhost:{port}/api/health")
-    
+
     print()
     print("📁 文件存储:")
     print(f"   - 上传目录: {UPLOAD_FOLDER}")
     print(f"   - 模型目录: {MODEL_FOLDER}")
     print()
-    
+
     if render_service_name:
         print(f"☁️  Render 服务: {render_service_name}")
         print("🔧 生产模式: CPU-only PyTorch")
     else:
         print("🔧 开发模式: 已启用代码热重载")
-    
+
     print("💡 内存优化: 延迟加载模型 + CPU-only PyTorch")
     print("按 Ctrl+C 停止服务器")
     print("=" * 60)
