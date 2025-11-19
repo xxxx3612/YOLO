@@ -60,13 +60,13 @@ yolo_model = None
 # 应用启动信息（Gunicorn 也会执行）
 is_render = os.environ.get("RENDER") == "true"
 if is_render:
-    print("🎯 YOLO API | Render 生产环境 | 预加载模型中...")
+    print("🎯 YOLO API | Render 生产环境")
 else:
-    print("🎯 YOLO API | 本地开发 | 预加载模型中...")
+    print("🎯 YOLO API | 本地开发")
 
 
 def get_yolo_model():
-    """延迟加载 YOLO 模型（首次请求时加载）"""
+    """获取或加载 YOLO 模型（线程安全）"""
     global yolo_model
     if yolo_model is None:
         try:
@@ -84,16 +84,6 @@ def get_yolo_model():
             print(f"✗ 模型加载失败: {e}")
             raise
     return yolo_model
-
-
-# 应用启动时预加载模型
-try:
-    yolo_model = get_yolo_model()
-    print("✅ 模型预加载完成，系统就绪！")
-except Exception as e:
-    print(f"⚠️  模型预加载失败: {e}")
-    print("   模型将在首次请求时加载")
-    yolo_model = None
 
 
 def allowed_file(filename):
