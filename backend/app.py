@@ -310,12 +310,13 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     host = "0.0.0.0"
 
-    # 检测是否在 Render 环境
-    render_service_name = os.environ.get("RENDER_SERVICE_NAME")
-    render_external_url = os.environ.get("RENDER_EXTERNAL_URL")
+    # 检测是否在 Render 环境（RENDER 变量由 Render 自动设置）
+    is_render = os.environ.get("RENDER") == "true"
+    render_service_name = os.environ.get("RENDER_SERVICE_NAME", "yolo-detection-api")
+    render_external_url = os.environ.get("RENDER_EXTERNAL_URL", "https://yolo-cp1y.onrender.com")
 
     print("📍 服务地址:")
-    if render_external_url:
+    if is_render and render_external_url:
         # Render 生产环境
         print(f"   - 外部访问: {render_external_url}")
         print(f"   - API:     {render_external_url}/api/detect")
@@ -332,7 +333,7 @@ if __name__ == "__main__":
     print(f"   - 模型目录: {MODEL_FOLDER}")
     print()
 
-    if render_service_name:
+    if is_render:
         print(f"☁️  Render 服务: {render_service_name}")
         print("🔧 生产模式: CPU-only PyTorch")
     else:
@@ -345,7 +346,6 @@ if __name__ == "__main__":
 
     # 启动 Flask 服务器
     # Render 环境禁用 debug 和 reloader 以避免重启问题
-    is_render = bool(render_service_name)
     app.run(
         host=host, 
         port=port, 
