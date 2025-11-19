@@ -16,11 +16,10 @@ from ultralytics import YOLO
 from datetime import datetime
 from pathlib import Path
 
-# 性能优化设置（平衡速度和内存）
-torch.set_num_threads(2)  # 使用 2 个 CPU 线程（提升速度）
+# 性能优化设置（最大化速度，无内存限制）
+# torch.set_num_threads() 不设置，使用系统默认（所有CPU核心）
 torch.set_grad_enabled(False)  # 禁用梯度计算（仅推理）
-os.environ["OMP_NUM_THREADS"] = "2"
-os.environ["MKL_NUM_THREADS"] = "2"
+# 环境变量不设置线程限制，让OpenMP/MKL自动优化
 
 # 配置
 BASE_DIR = Path(__file__).parent
@@ -109,16 +108,8 @@ def perform_detection(image_path, confidence=0.25, iou=0.45):
         if image is None:
             raise ValueError("无法读取图像")
 
-        # 限制图像尺寸以减少内存占用
-        max_dimension = 640
-        height, width = image.shape[:2]
-        if max(height, width) > max_dimension:
-            scale = max_dimension / max(height, width)
-            new_width = int(width * scale)
-            new_height = int(height * scale)
-            image = cv2.resize(
-                image, (new_width, new_height), interpolation=cv2.INTER_AREA
-            )
+        # 无尺寸限制，使用原始分辨率以获得最佳检测效果
+        # YOLO 会自动处理图像尺寸优化
 
         # YOLO 检测
         results = model(image, conf=confidence, iou=iou)
@@ -145,8 +136,8 @@ def perform_detection(image_path, confidence=0.25, iou=0.45):
         # 绘制检测结果
         annotated_image = result.plot()
 
-        # 将图像编码为 base64，降低质量以节省内存
-        encode_param = [cv2.IMWRITE_JPEG_QUALITY, 85]  # 85% 质量（默认 95）
+        # 将图像编码为 base64（高质量）
+        encode_param = [cv2.IMWRITE_JPEG_QUALITY, 95]  # 95% 质量
         _, buffer = cv2.imencode(".jpg", annotated_image, encode_param)
         image_base64 = base64.b64encode(buffer).decode("utf-8")
 
@@ -160,9 +151,6 @@ def perform_detection(image_path, confidence=0.25, iou=0.45):
 
     except Exception as e:
         return {"success": False, "error": str(e)}
-    finally:
-        # 清理内存
-        gc.collect()
 
 
 # ============ API 路由 ============
