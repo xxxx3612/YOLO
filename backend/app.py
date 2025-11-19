@@ -313,7 +313,9 @@ if __name__ == "__main__":
     # 检测是否在 Render 环境（RENDER 变量由 Render 自动设置）
     is_render = os.environ.get("RENDER") == "true"
     render_service_name = os.environ.get("RENDER_SERVICE_NAME", "yolo-detection-api")
-    render_external_url = os.environ.get("RENDER_EXTERNAL_URL", "https://yolo-cp1y.onrender.com")
+    render_external_url = os.environ.get(
+        "RENDER_EXTERNAL_URL", "https://yolo-cp1y.onrender.com"
+    )
 
     print("📍 服务地址:")
     if is_render and render_external_url:
