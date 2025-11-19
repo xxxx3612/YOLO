@@ -22,7 +22,4 @@ services:
       - key: NODE_VERSION
         value: 18
       - key: VITE_API_URL
-        fromService:
-          name: yolo-detection-api
-          type: web
-          property: host
+        value: https://yolo-cp1y.onrender.com
