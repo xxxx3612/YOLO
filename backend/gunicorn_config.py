@@ -7,7 +7,7 @@ Gunicorn 配置文件
 def post_worker_init(worker):
     """Worker 进程启动后执行 - 预加载 YOLO Pose 模型"""
     from app import get_yolo_model
-    
+
     worker.log.info("Worker 启动，预加载 YOLO 模型...")
     try:
         get_yolo_model()
