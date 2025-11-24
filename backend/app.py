@@ -63,6 +63,14 @@ CORS(
 # 全局 YOLO 模型
 yolo_model = None
 
+# COCO 骨架连接定义 (索引对)
+SKELETON = [
+    (0, 1), (0, 2), (1, 3), (2, 4),  # 头部
+    (5, 6), (5, 7), (7, 9), (6, 8), (8, 10),  # 上肢
+    (11, 12), (5, 11), (6, 12),  # 躯干
+    (11, 13), (13, 15), (12, 14), (14, 16)  # 下肢
+]
+
 
 # 应用启动信息（Gunicorn 也会执行）
 is_render = os.environ.get("RENDER") == "true"
@@ -200,8 +208,19 @@ def perform_detection(image_path, confidence=0.25, iou=0.45, analyze_head_pose_e
                 # 绘制检测框
                 cv2.rectangle(annotated_image, (x1, y1), (x2, y2), color, 2)
                 
-                # 绘制关键点
+                # 绘制骨架连线
                 keypoints = detection['keypoints']
+                for p1_idx, p2_idx in SKELETON:
+                    if p1_idx < len(keypoints) and p2_idx < len(keypoints):
+                        kp1 = keypoints[p1_idx]
+                        kp2 = keypoints[p2_idx]
+                        # 只有当两个关键点置信度都足够高时才绘制连线
+                        if kp1['confidence'] > 0.5 and kp2['confidence'] > 0.5:
+                            pt1 = (int(kp1['x']), int(kp1['y']))
+                            pt2 = (int(kp2['x']), int(kp2['y']))
+                            cv2.line(annotated_image, pt1, pt2, color, 2)
+
+                # 绘制关键点
                 for kp in keypoints:
                     if kp['confidence'] > 0.5:
                         kp_x, kp_y = int(kp['x']), int(kp['y'])
