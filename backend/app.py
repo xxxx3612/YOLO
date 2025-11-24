@@ -5,8 +5,7 @@ YOLO 姿态检测系统 - Flask 后端 API
 """
 import os
 import base64
-import gc
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
 import cv2
@@ -26,7 +25,6 @@ else:
     print("💻 未检测到GPU，使用CPU模式")
 
 # 性能优化设置（最大化速度，无内存限制）
-# torch.set_num_threads() 不设置，使用系统默认（所有CPU核心）
 torch.set_grad_enabled(False)  # 禁用梯度计算（仅推理）
 # 环境变量不设置线程限制，让OpenMP/MKL自动优化
 

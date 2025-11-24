@@ -2,7 +2,6 @@
 头部姿态分析模块
 通过YOLO关键点分析人体的抬头、低头动作
 """
-import numpy as np
 from typing import Dict, List, Optional, Tuple
 
 
@@ -59,20 +58,7 @@ class HeadPoseAnalyzer:
         return None
     
     def calculate_head_angle(self, keypoints: List[Dict]) -> Optional[float]:
-        """
-        计算头部倾斜角度
-        
-        原理：
-        1. 使用鼻子、眼睛、耳朵和肩膀关键点
-        2. 计算头部中心点和肩膀中心点的垂直距离
-        3. 通过鼻子相对于眼睛的位置判断头部角度
-        
-        Args:
-            keypoints: 关键点列表
-            
-        Returns:
-            头部角度（度），正值为低头，负值为抬头，None表示无法计算
-        """
+
         # 获取关键点
         nose = self._get_keypoint(keypoints, self.KEYPOINT_INDICES['nose'])
         left_eye = self._get_keypoint(keypoints, self.KEYPOINT_INDICES['left_eye'])
@@ -141,15 +127,7 @@ class HeadPoseAnalyzer:
         return None
     
     def analyze_pose(self, keypoints: List[Dict]) -> Dict:
-        """
-        分析单个人的头部姿态
-        
-        Args:
-            keypoints: 关键点列表
-            
-        Returns:
-            分析结果字典
-        """
+
         angle = self.calculate_head_angle(keypoints)
         
         result = {
@@ -172,15 +150,7 @@ class HeadPoseAnalyzer:
         return result
     
     def analyze_detections(self, detections: List[Dict]) -> List[Dict]:
-        """
-        分析多个检测结果的头部姿态
-        
-        Args:
-            detections: 检测结果列表
-            
-        Returns:
-            带有头部姿态分析的检测结果列表
-        """
+
         results = []
         
         for detection in detections:
@@ -196,15 +166,7 @@ class HeadPoseAnalyzer:
         return results
     
     def get_statistics(self, detections_with_pose: List[Dict]) -> Dict:
-        """
-        获取姿态统计信息
-        
-        Args:
-            detections_with_pose: 带有姿态分析的检测结果
-            
-        Returns:
-            统计信息
-        """
+
         total = len(detections_with_pose)
         head_up = sum(1 for d in detections_with_pose 
                      if d.get('head_pose', {}).get('pose') == 'head_up')
@@ -229,17 +191,7 @@ class HeadPoseAnalyzer:
 def analyze_head_pose(detections: List[Dict], 
                      head_up_threshold: float = -10.0,
                      head_down_threshold: float = 15.0) -> Tuple[List[Dict], Dict]:
-    """
-    便捷函数：分析检测结果中的头部姿态
-    
-    Args:
-        detections: YOLO检测结果列表
-        head_up_threshold: 抬头角度阈值
-        head_down_threshold: 低头角度阈值
-        
-    Returns:
-        (带姿态分析的检测结果, 统计信息)
-    """
+
     analyzer = HeadPoseAnalyzer(head_up_threshold, head_down_threshold)
     detections_with_pose = analyzer.analyze_detections(detections)
     statistics = analyzer.get_statistics(detections_with_pose)

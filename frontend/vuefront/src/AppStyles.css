@@ -439,29 +439,21 @@
 }
 
 /* 滚动条样式 */
-.custom-scrollbar::-webkit-scrollbar,
-.results-content::-webkit-scrollbar,
-.student-list::-webkit-scrollbar {
+.results-content::-webkit-scrollbar {
   width: 8px;
 }
 
-.custom-scrollbar::-webkit-scrollbar-track,
-.results-content::-webkit-scrollbar-track,
-.student-list::-webkit-scrollbar-track {
+.results-content::-webkit-scrollbar-track {
   background: rgba(200, 200, 200, 0.3);
   border-radius: 10px;
 }
 
-.custom-scrollbar::-webkit-scrollbar-thumb,
-.results-content::-webkit-scrollbar-thumb,
-.student-list::-webkit-scrollbar-thumb {
+.results-content::-webkit-scrollbar-thumb {
   background: #6b9080;
   border-radius: 10px;
 }
 
-.custom-scrollbar::-webkit-scrollbar-thumb:hover,
-.results-content::-webkit-scrollbar-thumb:hover,
-.student-list::-webkit-scrollbar-thumb:hover {
+.results-content::-webkit-scrollbar-thumb:hover {
   background: #5a7c6b;
 }
 
