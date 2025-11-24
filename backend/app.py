@@ -67,10 +67,22 @@ yolo_model = None
 
 # COCO 骨架连接定义 (索引对)
 SKELETON = [
-    (0, 1), (0, 2), (1, 3), (2, 4),  # 头部
-    (5, 6), (5, 7), (7, 9), (6, 8), (8, 10),  # 上肢
-    (11, 12), (5, 11), (6, 12),  # 躯干
-    (11, 13), (13, 15), (12, 14), (14, 16)  # 下肢
+    (0, 1),
+    (0, 2),
+    (1, 3),
+    (2, 4),  # 头部
+    (5, 6),
+    (5, 7),
+    (7, 9),
+    (6, 8),
+    (8, 10),  # 上肢
+    (11, 12),
+    (5, 11),
+    (6, 12),  # 躯干
+    (11, 13),
+    (13, 15),
+    (12, 14),
+    (14, 16),  # 下肢
 ]
 
 
@@ -215,9 +227,9 @@ def perform_detection(
 
                 # 绘制检测框
                 cv2.rectangle(annotated_image, (x1, y1), (x2, y2), color, 2)
-                
+
                 # 绘制关键点
-                keypoints = detection['keypoints']
+                keypoints = detection["keypoints"]
                 for kp in keypoints:
                     if kp["confidence"] > 0.5:
                         kp_x, kp_y = int(kp["x"]), int(kp["y"])
