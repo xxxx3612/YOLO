@@ -1,0 +1,214 @@
+/* 灰绿色主题覆盖样式 */
+
+/* 全局背景 */
+body, #app {
+  background: #f5f5f5 !important;
+}
+
+/* 占位符 */
+.placeholder {
+  background: #f8f9fa !important;
+}
+
+.placeholder-icon {
+  color: #a4c3b2 !important;
+  opacity: 1 !important;
+}
+
+.placeholder-text {
+  color: #6c757d !important;
+}
+
+/* 上传区域 */
+.upload-area {
+  background: #f8f9fa !important;
+  border-color: #a4c3b2 !important;
+}
+
+.upload-area:hover {
+  background: #e8f5e9 !important;
+  border-color: #6b9080 !important;
+}
+
+.upload-icon {
+  color: #6b9080 !important;
+  opacity: 1 !important;
+}
+
+.upload-title {
+  color: #2c3e50 !important;
+}
+
+.upload-hint {
+  color: #6c757d !important;
+}
+
+/* 按钮 */
+.btn-primary {
+  background: #6b9080 !important;
+  border-color: #6b9080 !important;
+}
+
+.btn-primary:hover:not(.btn-disabled) {
+  background: #5a7c6b !important;
+  border-color: #5a7c6b !important;
+}
+
+.btn-success {
+  background: #6b9080 !important;
+  border-color: #6b9080 !important;
+}
+
+.btn-purple {
+  background: #6b9080 !important;
+  border-color: #6b9080 !important;
+}
+
+.btn-blue {
+  background: #6b9080 !important;
+  border-color: #6b9080 !important;
+}
+
+.btn-green {
+  background: #6b9080 !important;
+  border-color: #6b9080 !important;
+}
+
+.btn-orange {
+  background: #e8b17d !important;
+  border-color: #e8b17d !important;
+}
+
+.btn-danger {
+  background: #c94c4c !important;
+  border-color: #c94c4c !important;
+}
+
+/* 结果内容 */
+.results-content {
+  background: #fafafa !important;
+}
+
+.results-placeholder {
+  color: #adb5bd !important;
+}
+
+/* 统计卡片 */
+.stat-card {
+  background: #ffffff !important;
+  border: 2px solid #a4c3b2 !important;
+}
+
+.stat-label {
+  color: #6c757d !important;
+}
+
+.stat-value, .stat-value-small {
+  color: #2c3e50 !important;
+}
+
+.stat-blue, .stat-green {
+  background: #ffffff !important;
+  border-color: #a4c3b2 !important;
+}
+
+/* 详情 */
+.details-title {
+  color: #2c3e50 !important;
+}
+
+.detail-item {
+  background: #ffffff !important;
+  border: 2px solid #d1e3d9 !important;
+}
+
+.detail-item:hover {
+  border-color: #6b9080 !important;
+}
+
+.detail-badge {
+  background: #6b9080 !important;
+}
+
+.detail-name {
+  color: #2c3e50 !important;
+}
+
+.confidence-label {
+  color: #6c757d !important;
+}
+
+.confidence-value {
+  color: #6b9080 !important;
+}
+
+.info-tag {
+  background: #6b9080 !important;
+}
+
+/* 行为监测 */
+.behavior-section {
+  border-top-color: #d1e3d9 !important;
+}
+
+.summary-item {
+  background: #f8f9fa !important;
+  border-color: #d1e3d9 !important;
+}
+
+.summary-item:hover {
+  background: #e8f5e9 !important;
+}
+
+.summary-label {
+  color: #6c757d !important;
+}
+
+.summary-value {
+  color: #2c3e50 !important;
+}
+
+.student-card {
+  background: #ffffff !important;
+  border-color: #d1e3d9 !important;
+}
+
+.student-card:hover {
+  border-color: #6b9080 !important;
+}
+
+.student-id-badge {
+  background: #6b9080 !important;
+}
+
+.status-success {
+  background: #6b9080 !important;
+}
+
+.status-warning {
+  background: #e8b17d !important;
+}
+
+.status-info {
+  background: #7ba8c1 !important;
+}
+
+.student-stat {
+  background: #f8f9fa !important;
+}
+
+.stat-text {
+  color: #2c3e50 !important;
+}
+
+.angle-info {
+  color: #6c757d !important;
+}
+
+.student-angles {
+  border-top-color: #d1e3d9 !important;
+}
+
+.student-title {
+  color: #2c3e50 !important;
+}

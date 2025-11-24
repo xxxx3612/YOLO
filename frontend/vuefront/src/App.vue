@@ -11,12 +11,16 @@ const detectionResults = ref(null)
 const isCameraActive = ref(false)
 const isRealTimeDetecting = ref(false)
 const realTimeInterval = ref(null)
+const isVideoDetecting = ref(false)
+const videoDetectionInterval = ref(null)
 
 // DOM 引用
 const fileInputRef = ref(null)
 const videoRef = ref(null)
 const canvasRef = ref(null)
 const realtimeCanvasRef = ref(null)
+const videoPreviewRef = ref(null)
+const videoCanvasRef = ref(null)
 
 // 处理文件上传
 const handleFileSelect = (event) => {
@@ -31,6 +35,10 @@ const handleFileSelect = (event) => {
 
 // 清除当前文件
 const handleClear = () => {
+  // 停止视频检测
+  if (isVideoDetecting.value) {
+    stopVideoDetection()
+  }
   selectedFile.value = null
   previewUrl.value = null
   resultUrl.value = null
@@ -44,6 +52,12 @@ const handleClear = () => {
 const handleDetect = async () => {
   if (!selectedFile.value && !isCameraActive.value) {
     alert('请先上传图片或视频，或打开摄像头')
+    return
+  }
+
+  // 如果是视频模式，启动逐帧检测
+  if (mode.value === 'video') {
+    startVideoDetection()
     return
   }
 
@@ -244,6 +258,111 @@ const stopRealTimeDetection = () => {
   }
 }
 
+// 视频逐帧检测
+const startVideoDetection = async () => {
+  if (!videoPreviewRef.value || !videoCanvasRef.value) {
+    alert('视频元素未准备好')
+    return
+  }
+
+  const video = videoPreviewRef.value
+  const canvas = videoCanvasRef.value
+  
+  // 等待视频元数据加载
+  if (video.readyState < 2) {
+    await new Promise(resolve => {
+      video.addEventListener('loadedmetadata', resolve, { once: true })
+    })
+  }
+  
+  // 初始化画布
+  await new Promise(resolve => setTimeout(resolve, 100))
+  canvas.width = video.videoWidth || 1280
+  canvas.height = video.videoHeight || 720
+  
+  // 创建临时画布用于帧捕获
+  const tempCanvas = document.createElement('canvas')
+  
+  // 开始播放视频
+  video.play()
+  isVideoDetecting.value = true
+  isDetecting.value = true
+  
+  const detectFrame = async () => {
+    if (!isVideoDetecting.value || !video || video.paused || video.ended) {
+      stopVideoDetection()
+      return
+    }
+
+    try {
+      // 从视频捕获当前帧到临时画布
+      tempCanvas.width = video.videoWidth
+      tempCanvas.height = video.videoHeight
+      const tempCtx = tempCanvas.getContext('2d')
+      tempCtx.drawImage(video, 0, 0)
+
+      // 将帧转换为 Blob
+      const blob = await new Promise(resolve => tempCanvas.toBlob(resolve, 'image/jpeg', 0.8))
+      const formData = new FormData()
+      formData.append('image', blob, 'frame.jpg')
+      formData.append('confidence', '0.35')
+      formData.append('iou', '0.5')
+
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+      const response = await fetch(`${apiUrl}/api/detect`, {
+        method: 'POST',
+        body: formData
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success && data.result_image) {
+          // 在画布上显示检测结果
+          const img = new Image()
+          img.onload = () => {
+            if (canvas) {
+              const ctx = canvas.getContext('2d')
+              ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+            }
+          }
+          img.src = data.result_image
+
+          // 更新检测结果
+          const detections = data.detections.map(det => ({
+            personId: det.person_id,
+            confidence: det.confidence,
+            keypointCount: det.keypoint_count
+          }))
+          
+          detectionResults.value = {
+            detections: detections,
+            totalPersons: data.person_count,
+            processingTime: '实时'
+          }
+        }
+      }
+    } catch (error) {
+      console.error('视频检测错误:', error)
+    }
+
+    // 继续下一帧检测（50ms间隔）
+    if (isVideoDetecting.value) {
+      setTimeout(detectFrame, 50)
+    }
+  }
+
+  detectFrame()
+}
+
+const stopVideoDetection = () => {
+  isVideoDetecting.value = false
+  isDetecting.value = false
+  detectionResults.value = null
+  if (videoPreviewRef.value) {
+    videoPreviewRef.value.pause()
+  }
+}
+
 // 组件卸载时清理
 onUnmounted(() => {
   stopRealTimeDetection()
@@ -251,6 +370,9 @@ onUnmounted(() => {
     const stream = videoRef.value.srcObject
     const tracks = stream.getTracks()
     tracks.forEach(track => track.stop())
+  }
+  if (isVideoDetecting.value) {
+    stopVideoDetection()
   }
 })
 
@@ -337,10 +459,6 @@ const downloadResult = async () => {
                   <div class="placeholder-icon">📹</div>
                   <p class="placeholder-text">点击下方按钮启动摄像头</p>
                 </div>
-                <div v-if="isRealTimeDetecting" class="live-badge">
-                  <span class="live-dot"></span>
-                  实时检测中
-                </div>
               </div>
               <canvas ref="canvasRef" style="display: none" />
             </div>
@@ -354,7 +472,10 @@ const downloadResult = async () => {
               </div>
               <div v-else class="preview-container">
                 <img v-if="mode === 'image'" :src="previewUrl" alt="预览" class="preview-element" />
-                <video v-else :src="previewUrl" controls class="preview-element" />
+                <template v-else-if="mode === 'video'">
+                  <video ref="videoPreviewRef" :src="previewUrl" class="preview-element" v-show="!isVideoDetecting" />
+                  <canvas ref="videoCanvasRef" class="preview-element" v-show="isVideoDetecting" />
+                </template>
               </div>
               <input ref="fileInputRef" type="file" :accept="mode === 'image' ? 'image/*' : 'video/*'" @change="handleFileSelect" class="hidden" />
             </div>
@@ -387,10 +508,15 @@ const downloadResult = async () => {
                 <span>{{ previewUrl ? '重新选择' : '打开文件' }}</span>
               </button>
               
-              <button @click="handleDetect" :disabled="isDetecting || !selectedFile" :class="['btn', 'btn-primary', 'btn-purple', { 'btn-disabled': isDetecting || !selectedFile }]">
-                <span v-if="isDetecting" class="btn-spinner"></span>
+              <button v-if="!isVideoDetecting" @click="handleDetect" :disabled="isDetecting || !selectedFile" :class="['btn', 'btn-primary', 'btn-purple', { 'btn-disabled': isDetecting || !selectedFile }]">
+                <span v-if="isDetecting && mode === 'image'" class="btn-spinner"></span>
                 <span v-else class="btn-icon">🚀</span>
-                <span>{{ isDetecting ? '检测中...' : '开始检测' }}</span>
+                <span>{{ isDetecting && mode === 'image' ? '检测中...' : '开始检测' }}</span>
+              </button>
+              
+              <button v-if="isVideoDetecting" @click="stopVideoDetection" class="btn btn-primary btn-orange">
+                <span class="btn-icon">⏹</span>
+                <span>停止检测</span>
               </button>
             </template>
           </div>
@@ -475,633 +601,3 @@ const downloadResult = async () => {
     </div>
   </div>
 </template>
-
-<style scoped>
-/* 主容器 */
-.app-container {
-  width: 100vw;
-  height: 100vh;
-  display: flex;
-  background: linear-gradient(135deg, #1e293b 0%, #581c87 50%, #1e293b 100%);
-  overflow: hidden;
-}
-
-/* 侧边栏 */
-.sidebar {
-  width: 80px;
-  min-width: 80px;
-  background: linear-gradient(180deg, #4f46e5 0%, #7c3aed 100%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 2rem 0;
-  gap: 1rem;
-  box-shadow: 4px 0 20px rgba(0, 0, 0, 0.3);
-}
-
-.logo {
-  font-size: 2.5rem;
-  margin-bottom: 1rem;
-}
-
-.mode-btn {
-  width: 56px;
-  height: 56px;
-  border-radius: 12px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  background: rgba(255, 255, 255, 0.2);
-  color: white;
-  border: none;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.mode-btn:hover {
-  transform: scale(1.1);
-  background: rgba(255, 255, 255, 0.3);
-}
-
-.mode-btn.active {
-  background: white;
-  transform: scale(1.1);
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
-}
-
-.mode-btn.active .icon {
-  filter: none;
-}
-
-.mode-btn .icon {
-  font-size: 1.5rem;
-}
-
-.mode-btn .label {
-  font-size: 0.75rem;
-  margin-top: 0.25rem;
-  font-weight: 600;
-}
-
-.mode-btn.active .label {
-  color: #4f46e5;
-}
-
-/* 主内容区 */
-.main-content {
-  flex: 1;
-  display: flex;
-  gap: 1.5rem;
-  padding: 1.5rem;
-  overflow: hidden;
-}
-
-/* 检测面板和结果面板 */
-.detection-panel {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.results-panel {
-  width: 420px;
-  min-width: 420px;
-  display: flex;
-  flex-direction: column;
-}
-
-.panel-card {
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(10px);
-  border-radius: 1rem;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  overflow: hidden;
-}
-
-/* 面板标题 */
-.panel-header {
-  background: linear-gradient(90deg, rgba(79, 70, 229, 0.8) 0%, rgba(124, 58, 237, 0.8) 100%);
-  padding: 1.25rem 1.5rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.panel-title {
-  font-size: 1.5rem;
-  font-weight: 900;
-  color: white;
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  margin: 0;
-}
-
-.title-icon {
-  font-size: 1.75rem;
-}
-
-/* 显示区域 */
-.display-area {
-  flex: 1;
-  padding: 1.5rem;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-
-.camera-view,
-.file-view {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-
-.video-container,
-.preview-container {
-  flex: 1;
-  background: #000;
-  border-radius: 12px;
-  overflow: hidden;
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.video-element,
-.preview-element {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-}
-
-/* 占位符 */
-.placeholder {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, #1f2937 0%, #000 100%);
-}
-
-.placeholder-icon {
-  font-size: 6rem;
-  opacity: 0.5;
-  animation: pulse 2s infinite;
-}
-
-.placeholder-text {
-  font-size: 1.25rem;
-  color: rgba(255, 255, 255, 0.6);
-  margin-top: 1.5rem;
-}
-
-/* 实时检测徽章 */
-.live-badge {
-  position: absolute;
-  top: 1.5rem;
-  left: 1.5rem;
-  background: #ef4444;
-  color: white;
-  padding: 0.75rem 1.5rem;
-  border-radius: 9999px;
-  font-weight: bold;
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  box-shadow: 0 10px 30px rgba(239, 68, 68, 0.5);
-  animation: pulse 2s infinite;
-}
-
-.live-dot {
-  width: 12px;
-  height: 12px;
-  background: white;
-  border-radius: 50%;
-}
-
-/* 上传区域 */
-.upload-area {
-  width: 100%;
-  height: 100%;
-  border: 4px dashed rgba(99, 102, 241, 0.3);
-  border-radius: 12px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.upload-area:hover {
-  border-color: rgba(99, 102, 241, 0.6);
-  background: rgba(255, 255, 255, 0.05);
-}
-
-.upload-icon {
-  font-size: 6rem;
-  opacity: 0.5;
-  animation: bounce 2s infinite;
-}
-
-.upload-title {
-  color: white;
-  font-size: 1.875rem;
-  font-weight: bold;
-  margin-top: 2rem;
-  margin-bottom: 0.75rem;
-}
-
-.upload-hint {
-  color: rgba(255, 255, 255, 0.5);
-  font-size: 1.25rem;
-}
-
-/* 控制按钮 */
-.control-buttons {
-  padding: 1.5rem;
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 1rem;
-}
-
-.btn {
-  padding: 1rem 1.5rem;
-  border-radius: 12px;
-  font-weight: bold;
-  font-size: 1.125rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.75rem;
-  border: none;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-}
-
-.btn:hover:not(.btn-disabled) {
-  transform: scale(1.05);
-}
-
-.btn-icon {
-  font-size: 1.875rem;
-}
-
-.btn-primary {
-  color: white;
-}
-
-.btn-success {
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-}
-
-.btn-success:hover {
-  background: linear-gradient(135deg, #059669 0%, #047857 100%);
-}
-
-.btn-danger {
-  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-}
-
-.btn-danger:hover {
-  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
-}
-
-.btn-purple {
-  background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%);
-}
-
-.btn-purple:hover {
-  background: linear-gradient(135deg, #9333ea 0%, #6b21a8 100%);
-}
-
-.btn-orange {
-  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
-}
-
-.btn-orange:hover {
-  background: linear-gradient(135deg, #ea580c 0%, #c2410c 100%);
-}
-
-.btn-blue {
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-}
-
-.btn-blue:hover {
-  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
-}
-
-.btn-green {
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-}
-
-.btn-green:hover {
-  background: linear-gradient(135deg, #059669 0%, #047857 100%);
-}
-
-.btn-full {
-  grid-column: 1 / -1;
-}
-
-.btn-disabled {
-  background: #4b5563;
-  color: #9ca3af;
-  cursor: not-allowed;
-  opacity: 0.6;
-}
-
-.btn-spinner {
-  width: 1.5rem;
-  height: 1.5rem;
-  border: 4px solid white;
-  border-top-color: transparent;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-
-/* 结果内容 */
-.results-content {
-  flex: 1;
-  padding: 1.5rem;
-  overflow-y: auto;
-  min-height: 0;
-}
-
-.results-placeholder {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-}
-
-.results-data {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.result-image {
-  background: #000;
-  border-radius: 12px;
-  overflow: hidden;
-}
-
-.result-image img {
-  width: 100%;
-  height: auto;
-  display: block;
-}
-
-/* 统计卡片 */
-.stats-section {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 0.75rem;
-}
-
-.stat-card {
-  padding: 1.25rem;
-  border-radius: 12px;
-  color: white;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
-}
-
-.stat-blue {
-  background: linear-gradient(135deg, #3b82f6 0%, #4f46e5 100%);
-}
-
-.stat-green {
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-}
-
-.stat-label {
-  font-size: 0.875rem;
-  opacity: 0.9;
-  margin-bottom: 0.5rem;
-}
-
-.stat-value {
-  font-size: 2.5rem;
-  font-weight: 900;
-  line-height: 1;
-}
-
-.stat-value-small {
-  font-size: 1.5rem;
-  font-weight: 900;
-}
-
-/* 详细信息 */
-.details-section {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
-  padding: 1.25rem;
-  backdrop-filter: blur(10px);
-}
-
-.details-title {
-  color: white;
-  font-weight: bold;
-  margin-bottom: 1rem;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 1.125rem;
-}
-
-.details-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  max-height: 300px;
-  overflow-y: auto;
-  padding-right: 0.5rem;
-}
-
-.detail-item {
-  background: rgba(255, 255, 255, 0.1);
-  padding: 1rem;
-  border-radius: 12px;
-  border: 2px solid transparent;
-  transition: all 0.3s ease;
-}
-
-.detail-item:hover {
-  background: rgba(255, 255, 255, 0.15);
-  border-color: rgba(255, 255, 255, 0.2);
-}
-
-.detail-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 0.75rem;
-}
-
-.detail-left {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.detail-badge {
-  width: 40px;
-  height: 40px;
-  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
-  color: white;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 900;
-  font-size: 1.125rem;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
-}
-
-.detail-name {
-  color: white;
-  font-weight: bold;
-  font-size: 1rem;
-}
-
-.detail-right {
-  text-align: right;
-}
-
-.confidence-label {
-  color: rgba(255, 255, 255, 0.6);
-  font-size: 0.75rem;
-  margin-bottom: 0.25rem;
-}
-
-.confidence-value {
-  color: #10b981;
-  font-weight: 900;
-  font-size: 1.25rem;
-}
-
-.detail-info {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.info-tag {
-  background: linear-gradient(135deg, #3b82f6 0%, #4f46e5 100%);
-  color: white;
-  padding: 0.5rem 0.75rem;
-  border-radius: 9999px;
-  font-weight: bold;
-  font-size: 0.75rem;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-}
-
-/* 滚动条样式 */
-.custom-scrollbar::-webkit-scrollbar,
-.details-list::-webkit-scrollbar,
-.results-content::-webkit-scrollbar {
-  width: 8px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-track,
-.details-list::-webkit-scrollbar-track,
-.results-content::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 10px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb,
-.details-list::-webkit-scrollbar-thumb,
-.results-content::-webkit-scrollbar-thumb {
-  background: linear-gradient(to bottom, #4f46e5, #7c3aed);
-  border-radius: 10px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb:hover,
-.details-list::-webkit-scrollbar-thumb:hover,
-.results-content::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(to bottom, #4338ca, #6b21a8);
-}
-
-/* 动画 */
-@keyframes pulse {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.5;
-  }
-}
-
-@keyframes bounce {
-  0%, 100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-20px);
-  }
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-/* 隐藏元素 */
-.hidden {
-  display: none;
-}
-
-/* 响应式调整 */
-@media (max-width: 1280px) {
-  .results-panel {
-    width: 360px;
-    min-width: 360px;
-  }
-}
-
-@media (max-width: 1024px) {
-  .main-content {
-    flex-direction: column;
-  }
-  
-  .results-panel {
-    width: 100%;
-    min-width: 0;
-    max-height: 40vh;
-  }
-}
-</style>
-
-<style>
-/* 全局样式重置 */
-html, body {
-  margin: 0 !important;
-  padding: 0 !important;
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-}
-
-#app {
-  width: 100%;
-  height: 100%;
-}
-</style>
