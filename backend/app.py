@@ -17,10 +17,12 @@ from pathlib import Path
 from head_pose_analyzer import analyze_head_pose
 
 # GPU/CPU 设备检测
-device = 'cuda' if torch.cuda.is_available() else 'cpu'
+device = "cuda" if torch.cuda.is_available() else "cpu"
 if torch.cuda.is_available():
     print(f"🚀 检测到GPU: {torch.cuda.get_device_name(0)}")
-    print(f"   显存: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.2f} GB")
+    print(
+        f"   显存: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.2f} GB"
+    )
 else:
     print("💻 未检测到GPU，使用CPU模式")
 
@@ -95,10 +97,12 @@ def get_yolo_model():
 
             # 将模型移动到GPU或CPU
             yolo_model.to(device)
-            
+
             print(f"✓ YOLO 姿态检测模型加载成功！")
             print(f"  运行设备: {device.upper()}")
-            print(f"  关键点数量: {yolo_model.model.kpt_shape if hasattr(yolo_model.model, 'kpt_shape') else '17 (COCO format)'}")
+            print(
+                f"  关键点数量: {yolo_model.model.kpt_shape if hasattr(yolo_model.model, 'kpt_shape') else '17 (COCO format)'}"
+            )
         except Exception as e:
             print(f"✗ 模型加载失败: {e}")
             raise
@@ -124,7 +128,9 @@ def save_uploaded_file(file):
     return None, None
 
 
-def perform_detection(image_path, confidence=0.25, iou=0.45, analyze_head_pose_enabled=False):
+def perform_detection(
+    image_path, confidence=0.25, iou=0.45, analyze_head_pose_enabled=False
+):
     """执行 YOLO 姿态检测"""
     try:
         # 获取模型（延迟加载）
@@ -147,7 +153,7 @@ def perform_detection(image_path, confidence=0.25, iou=0.45, analyze_head_pose_e
         if result.keypoints is not None and result.boxes is not None:
             keypoints_data = result.keypoints.cpu().numpy()
             boxes = result.boxes.cpu().numpy()
-            
+
             for idx, (box, kpts) in enumerate(zip(boxes, keypoints_data.data)):
                 # 提取关键点坐标和置信度
                 keypoints_list = []
@@ -156,10 +162,12 @@ def perform_detection(image_path, confidence=0.25, iou=0.45, analyze_head_pose_e
                         kp = {
                             "x": float(kpts[i][0]),
                             "y": float(kpts[i][1]),
-                            "confidence": float(kpts[i][2]) if len(kpts[i]) > 2 else 0.0
+                            "confidence": (
+                                float(kpts[i][2]) if len(kpts[i]) > 2 else 0.0
+                            ),
                         }
                         keypoints_list.append(kp)
-                
+
                 detection = {
                     "person_id": idx,
                     "bbox": {
@@ -170,7 +178,7 @@ def perform_detection(image_path, confidence=0.25, iou=0.45, analyze_head_pose_e
                     },
                     "confidence": float(box.conf[0]),
                     "keypoints": keypoints_list,
-                    "keypoint_count": len(keypoints_list)
+                    "keypoint_count": len(keypoints_list),
                 }
                 detections.append(detection)
 
@@ -183,69 +191,79 @@ def perform_detection(image_path, confidence=0.25, iou=0.45, analyze_head_pose_e
         if analyze_head_pose_enabled and detections:
             # 手动绘制，使用头部姿态对应的颜色
             annotated_image = image.copy()
-            
+
             for detection in detections:
-                head_pose = detection.get('head_pose', {})
-                pose_type = head_pose.get('pose', 'unknown')
-                description = head_pose.get('description', '')
-                angle = head_pose.get('head_angle')
-                
+                head_pose = detection.get("head_pose", {})
+                pose_type = head_pose.get("pose", "unknown")
+                description = head_pose.get("description", "")
+                angle = head_pose.get("head_angle")
+
                 # 获取边界框
-                bbox = detection['bbox']
-                x1, y1 = int(bbox['x1']), int(bbox['y1'])
-                x2, y2 = int(bbox['x2']), int(bbox['y2'])
-                
+                bbox = detection["bbox"]
+                x1, y1 = int(bbox["x1"]), int(bbox["y1"])
+                x2, y2 = int(bbox["x2"]), int(bbox["y2"])
+
                 # 根据姿态设置颜色 (BGR格式)
-                if pose_type == 'head_up':
+                if pose_type == "head_up":
                     color = (0, 165, 255)  # 橙色 - 抬头
-                elif pose_type == 'head_down':
+                elif pose_type == "head_down":
                     color = (0, 0, 255)  # 红色 - 低头
-                elif pose_type == 'normal':
+                elif pose_type == "normal":
                     color = (0, 255, 0)  # 绿色 - 正常
                 else:
                     color = (255, 0, 0)  # 蓝色 - 未知
-                
+
                 # 绘制检测框
                 cv2.rectangle(annotated_image, (x1, y1), (x2, y2), color, 2)
                 
-                # 绘制骨架连线
-                keypoints = detection['keypoints']
-                for p1_idx, p2_idx in SKELETON:
-                    if p1_idx < len(keypoints) and p2_idx < len(keypoints):
-                        kp1 = keypoints[p1_idx]
-                        kp2 = keypoints[p2_idx]
-                        # 只有当两个关键点置信度都足够高时才绘制连线
-                        if kp1['confidence'] > 0.5 and kp2['confidence'] > 0.5:
-                            pt1 = (int(kp1['x']), int(kp1['y']))
-                            pt2 = (int(kp2['x']), int(kp2['y']))
-                            cv2.line(annotated_image, pt1, pt2, color, 2)
-
                 # 绘制关键点
+                keypoints = detection['keypoints']
                 for kp in keypoints:
-                    if kp['confidence'] > 0.5:
-                        kp_x, kp_y = int(kp['x']), int(kp['y'])
+                    if kp["confidence"] > 0.5:
+                        kp_x, kp_y = int(kp["x"]), int(kp["y"])
                         cv2.circle(annotated_image, (kp_x, kp_y), 3, color, -1)
-                
+
                 # 绘制姿态文本
                 text = f"{description}"
                 if angle is not None:
                     text += f" ({angle:.1f}deg)"
-                
+
                 # 添加置信度
                 conf_text = f"{detection['confidence']*100:.1f}%"
-                
+
                 # 绘制文本背景
-                (text_width, text_height), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
-                cv2.rectangle(annotated_image, (x1, y1 - text_height - 10), 
-                            (x1 + text_width + 10, y1), color, -1)
-                
+                (text_width, text_height), _ = cv2.getTextSize(
+                    text, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2
+                )
+                cv2.rectangle(
+                    annotated_image,
+                    (x1, y1 - text_height - 10),
+                    (x1 + text_width + 10, y1),
+                    color,
+                    -1,
+                )
+
                 # 绘制文本
-                cv2.putText(annotated_image, text, (x1 + 5, y1 - 5),
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-                
+                cv2.putText(
+                    annotated_image,
+                    text,
+                    (x1 + 5, y1 - 5),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.6,
+                    (255, 255, 255),
+                    2,
+                )
+
                 # 绘制置信度（在框的右上角）
-                cv2.putText(annotated_image, conf_text, (x2 - 60, y1 + 20),
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+                cv2.putText(
+                    annotated_image,
+                    conf_text,
+                    (x2 - 60, y1 + 20),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.5,
+                    color,
+                    2,
+                )
         else:
             # 使用默认的YOLO绘制
             annotated_image = result.plot()
@@ -262,10 +280,10 @@ def perform_detection(image_path, confidence=0.25, iou=0.45, analyze_head_pose_e
             "result_image": f"data:image/jpeg;base64,{image_base64}",
             "image_size": {"width": image.shape[1], "height": image.shape[0]},
         }
-        
+
         # 添加头部姿态统计信息
         if head_pose_stats:
-            response_data['head_pose_statistics'] = head_pose_stats
+            response_data["head_pose_statistics"] = head_pose_stats
 
         return response_data
 
@@ -285,7 +303,7 @@ def index():
             "version": "1.0.0",
             "status": "running",
             "model_loaded": yolo_model is not None,
-            "model_type": "pose"
+            "model_type": "pose",
         }
     )
 
@@ -346,7 +364,9 @@ def detect():
         # 获取检测参数
         confidence = float(request.form.get("confidence", 0.25))
         iou = float(request.form.get("iou", 0.45))
-        analyze_head_pose_enabled = request.form.get("analyze_head_pose", "false").lower() == "true"
+        analyze_head_pose_enabled = (
+            request.form.get("analyze_head_pose", "false").lower() == "true"
+        )
 
         # 执行姿态检测
         result = perform_detection(filepath, confidence, iou, analyze_head_pose_enabled)
@@ -389,13 +409,10 @@ def get_keypoints_info():
             {"id": 13, "name": "left_knee", "name_zh": "左膝"},
             {"id": 14, "name": "right_knee", "name_zh": "右膝"},
             {"id": 15, "name": "left_ankle", "name_zh": "左踝"},
-            {"id": 16, "name": "right_ankle", "name_zh": "右踝"}
-        ]
+            {"id": 16, "name": "right_ankle", "name_zh": "右踝"},
+        ],
     }
-    return jsonify({
-        "success": True,
-        "keypoints": keypoints_coco
-    })
+    return jsonify({"success": True, "keypoints": keypoints_coco})
 
 
 @app.route("/api/classes", methods=["GET"])
@@ -486,7 +503,7 @@ if __name__ == "__main__":
     print(f"💡 内存优化: 延迟加载模型")
     print(f"🤸 模型类型: YOLO11n-Pose（姿态检测）")
     print(f"⚙️  推理设备: {device.upper()}")
-    if device == 'cuda':
+    if device == "cuda":
         print(f"   GPU加速已启用: {torch.cuda.get_device_name(0)}")
     print("按 Ctrl+C 停止服务器")
     print("=" * 60)
