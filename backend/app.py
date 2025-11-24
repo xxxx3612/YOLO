@@ -26,9 +26,8 @@ if torch.cuda.is_available():
 else:
     print("💻 未检测到GPU，使用CPU模式")
 
-# 性能优化设置（最大化速度，无内存限制）
+# 性能优化设置
 torch.set_grad_enabled(False)  # 禁用梯度计算（仅推理）
-# 环境变量不设置线程限制，让OpenMP/MKL自动优化
 
 # 配置
 BASE_DIR = Path(__file__).parent
