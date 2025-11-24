@@ -215,9 +215,19 @@ def perform_detection(
 
                 # 绘制检测框
                 cv2.rectangle(annotated_image, (x1, y1), (x2, y2), color, 2)
+
+                # 绘制骨架连线
+                keypoints = detection['keypoints']
+                for p1_idx, p2_idx in SKELETON:
+                    if p1_idx < len(keypoints) and p2_idx < len(keypoints):
+                        kp1 = keypoints[p1_idx]
+                        kp2 = keypoints[p2_idx]
+                        if kp1['confidence'] > 0.5 and kp2['confidence'] > 0.5:
+                            pt1 = (int(kp1['x']), int(kp1['y']))
+                            pt2 = (int(kp2['x']), int(kp2['y']))
+                            cv2.line(annotated_image, pt1, pt2, color, 2)
                 
                 # 绘制关键点
-                keypoints = detection['keypoints']
                 for kp in keypoints:
                     if kp["confidence"] > 0.5:
                         kp_x, kp_y = int(kp["x"]), int(kp["y"])
