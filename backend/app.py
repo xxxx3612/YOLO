@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-YOLO 目标检测系统 - Flask 后端 API
+YOLO 姿态检测系统 - Flask 后端 API
 开发环境配置
 """
 import os
@@ -15,6 +15,14 @@ import torch
 from ultralytics import YOLO
 from datetime import datetime
 from pathlib import Path
+
+# GPU/CPU 设备检测
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
+if torch.cuda.is_available():
+    print(f"🚀 检测到GPU: {torch.cuda.get_device_name(0)}")
+    print(f"   显存: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.2f} GB")
+else:
+    print("💻 未检测到GPU，使用CPU模式")
 
 # 性能优化设置（最大化速度，无内存限制）
 # torch.set_num_threads() 不设置，使用系统默认（所有CPU核心）
@@ -60,26 +68,30 @@ yolo_model = None
 # 应用启动信息（Gunicorn 也会执行）
 is_render = os.environ.get("RENDER") == "true"
 if is_render:
-    print("🎯 YOLO API | Render 生产环境")
+    print("🎯 YOLO 姿态检测 API | Render 生产环境")
 else:
-    print("🎯 YOLO API | 本地开发")
+    print("🎯 YOLO 姿态检测 API | 本地开发")
 
 
 def get_yolo_model():
-    """获取或加载 YOLO 模型（线程安全）"""
+    """获取或加载 YOLO Pose 模型（线程安全，支持GPU/CPU）"""
     global yolo_model
     if yolo_model is None:
         try:
-            model_path = MODEL_FOLDER / "yolov8n.pt"
+            model_path = MODEL_FOLDER / "yolo11n-pose.pt"
             if model_path.exists():
-                print(f"正在加载本地模型: {model_path}")
+                print(f"正在加载本地姿态检测模型: {model_path}")
                 yolo_model = YOLO(str(model_path))
             else:
-                print("本地模型不存在，将下载 YOLOv8n...")
-                yolo_model = YOLO("yolov8n.pt")
+                print("本地模型不存在，将下载 YOLO11n-pose...")
+                yolo_model = YOLO("yolo11n-pose.pt")
 
-            print(f"✓ YOLO 模型加载成功！")
-            print(f"  支持的类别数: {len(yolo_model.names)}")
+            # 将模型移动到GPU或CPU
+            yolo_model.to(device)
+            
+            print(f"✓ YOLO 姿态检测模型加载成功！")
+            print(f"  运行设备: {device.upper()}")
+            print(f"  关键点数量: {yolo_model.model.kpt_shape if hasattr(yolo_model.model, 'kpt_shape') else '17 (COCO format)'}")
         except Exception as e:
             print(f"✗ 模型加载失败: {e}")
             raise
@@ -106,7 +118,7 @@ def save_uploaded_file(file):
 
 
 def perform_detection(image_path, confidence=0.25, iou=0.45):
-    """执行 YOLO 目标检测"""
+    """执行 YOLO 姿态检测"""
     try:
         # 获取模型（延迟加载）
         model = get_yolo_model()
@@ -119,29 +131,43 @@ def perform_detection(image_path, confidence=0.25, iou=0.45):
         # 无尺寸限制，使用原始分辨率以获得最佳检测效果
         # YOLO 会自动处理图像尺寸优化
 
-        # YOLO 检测
-        results = model(image, conf=confidence, iou=iou)
+        # YOLO 姿态检测（使用GPU或CPU）
+        results = model(image, conf=confidence, iou=iou, device=device)
         result = results[0]
 
-        # 解析检测结果
+        # 解析姿态检测结果
         detections = []
-        if result.boxes is not None:
+        if result.keypoints is not None and result.boxes is not None:
+            keypoints_data = result.keypoints.cpu().numpy()
             boxes = result.boxes.cpu().numpy()
-            for box in boxes:
+            
+            for idx, (box, kpts) in enumerate(zip(boxes, keypoints_data.data)):
+                # 提取关键点坐标和置信度
+                keypoints_list = []
+                for i in range(len(kpts)):
+                    if len(kpts[i]) >= 2:  # 确保有 x, y 坐标
+                        kp = {
+                            "x": float(kpts[i][0]),
+                            "y": float(kpts[i][1]),
+                            "confidence": float(kpts[i][2]) if len(kpts[i]) > 2 else 0.0
+                        }
+                        keypoints_list.append(kp)
+                
                 detection = {
-                    "class_id": int(box.cls[0]),
-                    "class_name": model.names[int(box.cls[0])],
-                    "confidence": float(box.conf[0]),
+                    "person_id": idx,
                     "bbox": {
                         "x1": float(box.xyxy[0][0]),
                         "y1": float(box.xyxy[0][1]),
                         "x2": float(box.xyxy[0][2]),
                         "y2": float(box.xyxy[0][3]),
                     },
+                    "confidence": float(box.conf[0]),
+                    "keypoints": keypoints_list,
+                    "keypoint_count": len(keypoints_list)
                 }
                 detections.append(detection)
 
-        # 绘制检测结果
+        # 绘制姿态检测结果
         annotated_image = result.plot()
 
         # 将图像编码为 base64（高质量）
@@ -152,7 +178,7 @@ def perform_detection(image_path, confidence=0.25, iou=0.45):
         return {
             "success": True,
             "detections": detections,
-            "detection_count": len(detections),
+            "person_count": len(detections),
             "result_image": f"data:image/jpeg;base64,{image_base64}",
             "image_size": {"width": image.shape[1], "height": image.shape[0]},
         }
@@ -169,10 +195,11 @@ def index():
     """首页"""
     return jsonify(
         {
-            "service": "YOLO 目标检测 API",
+            "service": "YOLO 姿态检测 API",
             "version": "1.0.0",
             "status": "running",
             "model_loaded": yolo_model is not None,
+            "model_type": "pose"
         }
     )
 
@@ -184,7 +211,7 @@ def health_check():
     return jsonify(
         {
             "status": "healthy",
-            "service": "YOLO Detection API",
+            "service": "YOLO Pose Detection API",
             "model_loaded": model_loaded,
             "model_status": "loaded" if model_loaded else "will load on first request",
             "timestamp": datetime.now().isoformat(),
@@ -194,7 +221,7 @@ def health_check():
 
 @app.route("/api/detect", methods=["POST", "OPTIONS"])
 def detect():
-    """图像目标检测"""
+    """图像姿态检测"""
     if request.method == "OPTIONS":
         return "", 204
 
@@ -234,7 +261,7 @@ def detect():
         confidence = float(request.form.get("confidence", 0.25))
         iou = float(request.form.get("iou", 0.45))
 
-        # 执行检测
+        # 执行姿态检测
         result = perform_detection(filepath, confidence, iou)
 
         # 清理上传的临时文件
@@ -249,7 +276,39 @@ def detect():
             return jsonify(result), 500
 
     except Exception as e:
-        return jsonify({"success": False, "error": f"检测失败: {str(e)}"}), 500
+        return jsonify({"success": False, "error": f"姿态检测失败: {str(e)}"}), 500
+
+
+@app.route("/api/keypoints", methods=["GET"])
+def get_keypoints_info():
+    """获取姿态关键点信息"""
+    keypoints_coco = {
+        "format": "COCO",
+        "total": 17,
+        "points": [
+            {"id": 0, "name": "nose", "name_zh": "鼻子"},
+            {"id": 1, "name": "left_eye", "name_zh": "左眼"},
+            {"id": 2, "name": "right_eye", "name_zh": "右眼"},
+            {"id": 3, "name": "left_ear", "name_zh": "左耳"},
+            {"id": 4, "name": "right_ear", "name_zh": "右耳"},
+            {"id": 5, "name": "left_shoulder", "name_zh": "左肩"},
+            {"id": 6, "name": "right_shoulder", "name_zh": "右肩"},
+            {"id": 7, "name": "left_elbow", "name_zh": "左肘"},
+            {"id": 8, "name": "right_elbow", "name_zh": "右肘"},
+            {"id": 9, "name": "left_wrist", "name_zh": "左腕"},
+            {"id": 10, "name": "right_wrist", "name_zh": "右腕"},
+            {"id": 11, "name": "left_hip", "name_zh": "左髋"},
+            {"id": 12, "name": "right_hip", "name_zh": "右髋"},
+            {"id": 13, "name": "left_knee", "name_zh": "左膝"},
+            {"id": 14, "name": "right_knee", "name_zh": "右膝"},
+            {"id": 15, "name": "left_ankle", "name_zh": "左踝"},
+            {"id": 16, "name": "right_ankle", "name_zh": "右踝"}
+        ]
+    }
+    return jsonify({
+        "success": True,
+        "keypoints": keypoints_coco
+    })
 
 
 @app.route("/api/classes", methods=["GET"])
@@ -296,10 +355,10 @@ def internal_error(error):
 
 if __name__ == "__main__":
     print("=" * 60)
-    print("🎯 YOLO 目标检测系统 - 开发服务器")
+    print("🎯 YOLO 姿态检测系统 - 开发服务器")
     print("=" * 60)
     print()
-    print("✓ 系统就绪（模型将在首次请求时加载）")
+    print("✓ 系统就绪（姿态检测模型将在首次请求时加载）")
     print()
 
     # 从环境变量读取端口（Render 会设置 PORT）
@@ -333,11 +392,15 @@ if __name__ == "__main__":
 
     if is_render:
         print(f"☁️  Render 服务: {render_service_name}")
-        print("🔧 生产模式: CPU-only PyTorch")
+        print("🔧 生产模式: CPU-only PyTorch + Pose Detection")
     else:
         print("🔧 开发模式: 已启用代码热重载")
 
-    print("💡 内存优化: 延迟加载模型 + CPU-only PyTorch")
+    print(f"💡 内存优化: 延迟加载模型")
+    print(f"🤸 模型类型: YOLO11n-Pose（姿态检测）")
+    print(f"⚙️  推理设备: {device.upper()}")
+    if device == 'cuda':
+        print(f"   GPU加速已启用: {torch.cuda.get_device_name(0)}")
     print("按 Ctrl+C 停止服务器")
     print("=" * 60)
     print()
