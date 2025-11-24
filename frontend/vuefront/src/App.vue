@@ -13,6 +13,7 @@ const isRealTimeDetecting = ref(false)
 const realTimeInterval = ref(null)
 const isVideoDetecting = ref(false)
 const videoDetectionInterval = ref(null)
+const enableHeadPoseAnalysis = ref(true)
 
 // DOM 引用
 const fileInputRef = ref(null)
@@ -68,6 +69,7 @@ const handleDetect = async () => {
     formData.append('image', selectedFile.value)
     formData.append('confidence', '0.25')
     formData.append('iou', '0.45')
+    formData.append('analyze_head_pose', enableHeadPoseAnalysis.value ? 'true' : 'false')
 
     // 调用后端 API
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000'
@@ -89,13 +91,15 @@ const handleDetect = async () => {
         confidence: det.confidence,
         bbox: [det.bbox.x1, det.bbox.y1, det.bbox.x2, det.bbox.y2],
         keypoints: det.keypoints,
-        keypointCount: det.keypoint_count
+        keypointCount: det.keypoint_count,
+        headPose: det.head_pose
       }))
       
       detectionResults.value = {
         detections: detections,
         processingTime: '实时',
-        totalPersons: data.person_count
+        totalPersons: data.person_count,
+        headPoseStats: data.head_pose_statistics
       }
       
       // 显示结果图像（现在是 base64 格式）
@@ -200,6 +204,7 @@ const startRealTimeDetection = async () => {
       formData.append('image', blob, 'frame.jpg')
       formData.append('confidence', '0.35')
       formData.append('iou', '0.5')
+      formData.append('analyze_head_pose', enableHeadPoseAnalysis.value ? 'true' : 'false')
 
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000'
       const response = await fetch(`${apiUrl}/api/detect`, {
@@ -227,13 +232,15 @@ const startRealTimeDetection = async () => {
           const detections = data.detections.map(det => ({
             personId: det.person_id,
             confidence: det.confidence,
-            keypointCount: det.keypoint_count
+            keypointCount: det.keypoint_count,
+            headPose: det.head_pose
           }))
           
           detectionResults.value = {
             detections: detections,
             totalPersons: data.person_count,
-            processingTime: '实时'
+            processingTime: '实时',
+            headPoseStats: data.head_pose_statistics
           }
         }
       }
@@ -307,6 +314,7 @@ const startVideoDetection = async () => {
       formData.append('image', blob, 'frame.jpg')
       formData.append('confidence', '0.35')
       formData.append('iou', '0.5')
+      formData.append('analyze_head_pose', enableHeadPoseAnalysis.value ? 'true' : 'false')
 
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000'
       const response = await fetch(`${apiUrl}/api/detect`, {
@@ -331,13 +339,15 @@ const startVideoDetection = async () => {
           const detections = data.detections.map(det => ({
             personId: det.person_id,
             confidence: det.confidence,
-            keypointCount: det.keypoint_count
+            keypointCount: det.keypoint_count,
+            headPose: det.head_pose
           }))
           
           detectionResults.value = {
             detections: detections,
             totalPersons: data.person_count,
-            processingTime: '实时'
+            processingTime: '实时',
+            headPoseStats: data.head_pose_statistics
           }
         }
       }
@@ -483,6 +493,12 @@ const downloadResult = async () => {
 
           <!-- 底部控制按钮 -->
           <div class="control-buttons">
+            <!-- 头部姿态分析开关 -->
+            <div class="control-option" style="grid-column: 1 / -1; padding: 0.75rem 0; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+              <input type="checkbox" id="headPoseToggle" v-model="enableHeadPoseAnalysis" style="width: 18px; height: 18px; cursor: pointer;" />
+              <label for="headPoseToggle" style="cursor: pointer; font-size: 1rem; color: #2c3e50; font-weight: 600;">启用头部姿态分析（抬头/低头识别）</label>
+            </div>
+            
             <!-- 摄像头模式按钮 -->
             <template v-if="mode === 'camera'">
               <button @click="toggleCamera" :class="['btn', 'btn-primary', isCameraActive ? 'btn-danger' : 'btn-success']">
@@ -569,6 +585,26 @@ const downloadResult = async () => {
                   </div>
                 </div>
 
+                <!-- 头部姿态统计 -->
+                <div v-if="detectionResults.headPoseStats" class="stats-grid" style="margin-top: 0.75rem;">
+                  <div class="stat-card">
+                    <p class="stat-label">抬头</p>
+                    <p class="stat-value-small" style="color: #FF9500;">{{ detectionResults.headPoseStats.head_up_count }}</p>
+                  </div>
+                  <div class="stat-card">
+                    <p class="stat-label">低头</p>
+                    <p class="stat-value-small" style="color: #FF3B30;">{{ detectionResults.headPoseStats.head_down_count }}</p>
+                  </div>
+                  <div class="stat-card">
+                    <p class="stat-label">正常</p>
+                    <p class="stat-value-small" style="color: #34C759;">{{ detectionResults.headPoseStats.normal_count }}</p>
+                  </div>
+                  <div class="stat-card">
+                    <p class="stat-label">未知</p>
+                    <p class="stat-value-small" style="color: #8E8E93;">{{ detectionResults.headPoseStats.unknown_count }}</p>
+                  </div>
+                </div>
+
                 <!-- 详细信息 -->
                 <div class="details-section">
                   <h3 class="details-title">
@@ -589,6 +625,13 @@ const downloadResult = async () => {
                       </div>
                       <div class="detail-info">
                         <span class="info-tag">🎯 {{ detection.keypointCount }} 个关键点</span>
+                        <span v-if="detection.headPose && detection.headPose.pose !== 'unknown'" class="info-tag" :style="{ 
+                          background: detection.headPose.pose === 'head_up' ? '#FF9500' : 
+                                     detection.headPose.pose === 'head_down' ? '#FF3B30' : '#34C759' 
+                        }">
+                          {{ detection.headPose.description }}
+                          <span v-if="detection.headPose.head_angle !== null"> ({{ detection.headPose.head_angle }}°)</span>
+                        </span>
                       </div>
                     </div>
                   </div>

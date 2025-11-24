@@ -15,6 +15,7 @@ import torch
 from ultralytics import YOLO
 from datetime import datetime
 from pathlib import Path
+from head_pose_analyzer import analyze_head_pose
 
 # GPU/CPU 设备检测
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -117,7 +118,7 @@ def save_uploaded_file(file):
     return None, None
 
 
-def perform_detection(image_path, confidence=0.25, iou=0.45):
+def perform_detection(image_path, confidence=0.25, iou=0.45, analyze_head_pose_enabled=False):
     """执行 YOLO 姿态检测"""
     try:
         # 获取模型（延迟加载）
@@ -167,21 +168,89 @@ def perform_detection(image_path, confidence=0.25, iou=0.45):
                 }
                 detections.append(detection)
 
+        # 头部姿态分析（可选）
+        head_pose_stats = None
+        if analyze_head_pose_enabled and detections:
+            detections, head_pose_stats = analyze_head_pose(detections)
+
         # 绘制姿态检测结果
-        annotated_image = result.plot()
+        if analyze_head_pose_enabled and detections:
+            # 手动绘制，使用头部姿态对应的颜色
+            annotated_image = image.copy()
+            
+            for detection in detections:
+                head_pose = detection.get('head_pose', {})
+                pose_type = head_pose.get('pose', 'unknown')
+                description = head_pose.get('description', '')
+                angle = head_pose.get('head_angle')
+                
+                # 获取边界框
+                bbox = detection['bbox']
+                x1, y1 = int(bbox['x1']), int(bbox['y1'])
+                x2, y2 = int(bbox['x2']), int(bbox['y2'])
+                
+                # 根据姿态设置颜色 (BGR格式)
+                if pose_type == 'head_up':
+                    color = (0, 165, 255)  # 橙色 - 抬头
+                elif pose_type == 'head_down':
+                    color = (0, 0, 255)  # 红色 - 低头
+                elif pose_type == 'normal':
+                    color = (0, 255, 0)  # 绿色 - 正常
+                else:
+                    color = (255, 0, 0)  # 蓝色 - 未知
+                
+                # 绘制检测框
+                cv2.rectangle(annotated_image, (x1, y1), (x2, y2), color, 2)
+                
+                # 绘制关键点
+                keypoints = detection['keypoints']
+                for kp in keypoints:
+                    if kp['confidence'] > 0.5:
+                        kp_x, kp_y = int(kp['x']), int(kp['y'])
+                        cv2.circle(annotated_image, (kp_x, kp_y), 3, color, -1)
+                
+                # 绘制姿态文本
+                text = f"{description}"
+                if angle is not None:
+                    text += f" ({angle:.1f}deg)"
+                
+                # 添加置信度
+                conf_text = f"{detection['confidence']*100:.1f}%"
+                
+                # 绘制文本背景
+                (text_width, text_height), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
+                cv2.rectangle(annotated_image, (x1, y1 - text_height - 10), 
+                            (x1 + text_width + 10, y1), color, -1)
+                
+                # 绘制文本
+                cv2.putText(annotated_image, text, (x1 + 5, y1 - 5),
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+                
+                # 绘制置信度（在框的右上角）
+                cv2.putText(annotated_image, conf_text, (x2 - 60, y1 + 20),
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+        else:
+            # 使用默认的YOLO绘制
+            annotated_image = result.plot()
 
         # 将图像编码为 base64（高质量）
         encode_param = [cv2.IMWRITE_JPEG_QUALITY, 95]  # 95% 质量
         _, buffer = cv2.imencode(".jpg", annotated_image, encode_param)
         image_base64 = base64.b64encode(buffer).decode("utf-8")
 
-        return {
+        response_data = {
             "success": True,
             "detections": detections,
             "person_count": len(detections),
             "result_image": f"data:image/jpeg;base64,{image_base64}",
             "image_size": {"width": image.shape[1], "height": image.shape[0]},
         }
+        
+        # 添加头部姿态统计信息
+        if head_pose_stats:
+            response_data['head_pose_statistics'] = head_pose_stats
+
+        return response_data
 
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -260,9 +329,10 @@ def detect():
         # 获取检测参数
         confidence = float(request.form.get("confidence", 0.25))
         iou = float(request.form.get("iou", 0.45))
+        analyze_head_pose_enabled = request.form.get("analyze_head_pose", "false").lower() == "true"
 
         # 执行姿态检测
-        result = perform_detection(filepath, confidence, iou)
+        result = perform_detection(filepath, confidence, iou, analyze_head_pose_enabled)
 
         # 清理上传的临时文件
         try:
